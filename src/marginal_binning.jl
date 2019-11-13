@@ -1,14 +1,31 @@
 # helper functions and types to deal with the fact that we are discretizing the output variables.
-
-struct BinnedCalibrator{H<:Histogram{<:Any, 1,<:Any}}
+struct MCEBHistogram{S<:StepRangeLen, H<:Histogram}
+    grid::S
     hist::H
+end
+
+function MCEBHistogram(grid::StepRangeLen)
+    xs = [-Inf; collect(grid); +Inf]
+    ws = zeros(Float64, length(grid)+1)
+    hist = Histogram(xs, ws, :right, false)
+    MCEBHistogram(grid, hist)
+end
+
+StatsBase.binindex(mh::MCEBHistogram, x) = StatsBase.binindex(mh.hist, x)
+
+Base.first(mh::MCEBHistogram) = Base.first(mh.grid)
+Base.last(mh::MCEBHistogram) = Base.last(mh.grid)
+Base.step(mh::MCEBHistogram) = Base.step(mh.grid)
+
+struct BinnedCalibrator{MH<:MCEBHistogram}
+    mhist::MH
     Q::Vector{Float64}
     Qo::Float64 #offset
 end
 
-BinnedCalibrator(hist, Q) = BinnedCalibrator(hist, Q, zero(Float64))
+BinnedCalibrator(mhist, Q) = BinnedCalibrator(mhist, Q, zero(Float64))
 
 function (calib::BinnedCalibrator)(x)
-    idxs = StatsBase.binindex(calib.hist, x)
+    idxs = StatsBase.binindex(calib.mhist, x)
     calib.Q[idxs] + calib.Qo
 end
