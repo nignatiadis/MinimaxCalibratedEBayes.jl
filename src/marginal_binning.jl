@@ -16,6 +16,21 @@ StatsBase.binindex(mh::MCEBHistogram, x) = StatsBase.binindex(mh.hist, x)
 Base.first(mh::MCEBHistogram) = Base.first(mh.grid)
 Base.last(mh::MCEBHistogram) = Base.last(mh.grid)
 Base.step(mh::MCEBHistogram) = Base.step(mh.grid)
+broadcastable(mh::MCEBHistogram) = Ref(mh)
+
+pdf(mh::MCEBHistogram) = mh.hist.weights
+
+struct DiscretizedStandardNormalSample{T <: Number, MH<:MCEBHistogram} <: EBayesSample{T}
+    Z::T
+    mhist::MH
+end
+
+response(s::DiscretizedStandardNormalSample) = s.Z
+var(s::DiscretizedStandardNormalSample) = 1
+
+eltype(s::DiscretizedStandardNormalSample{T}) where T = T
+zero(s::DiscretizedStandardNormalSample{T}) where T = zero(T)
+
 
 struct BinnedCalibrator{MH<:MCEBHistogram}
     mhist::MH
