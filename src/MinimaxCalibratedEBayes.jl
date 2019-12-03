@@ -6,8 +6,11 @@ using Reexport
                 Distributions,
                 EBayes
 
+using RecipesBase
+
 import StatsBase:Histogram,
-                 binindex
+                 binindex,
+                 midpoints
 
 import Statistics:var
 
@@ -15,16 +18,19 @@ import Distributions:cf, pdf
 
 import Base:step,
             first,
-            last
+            last,
+            length,
+            zero
 
 import Base.Broadcast: broadcastable
 
 include("marginal_binning.jl")
+include("marginal_kde.jl")
 include("marginalize.jl")
 
 export MCEBHistogram,
        DiscretizedStandardNormalSample,
-       BinnedCalibrator,
+       DiscretizedAffineEstimator,
        marginalize
 
 end # module

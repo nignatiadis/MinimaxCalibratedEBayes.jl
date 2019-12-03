@@ -19,6 +19,7 @@ Base.step(mh::MCEBHistogram) = Base.step(mh.grid)
 broadcastable(mh::MCEBHistogram) = Ref(mh)
 
 pdf(mh::MCEBHistogram) = mh.hist.weights
+midpoints(mh::MCEBHistogram) = midpoints(mh.grid)
 
 struct DiscretizedStandardNormalSample{T <: Number, MH<:MCEBHistogram} <: EBayesSample{T}
     Z::T
@@ -32,15 +33,45 @@ eltype(s::DiscretizedStandardNormalSample{T}) where T = T
 zero(s::DiscretizedStandardNormalSample{T}) where T = zero(T)
 
 
-struct BinnedCalibrator{MH<:MCEBHistogram}
+struct DiscretizedAffineEstimator{MH<:MCEBHistogram}
     mhist::MH
     Q::Vector{Float64}
     Qo::Float64 #offset
 end
 
-BinnedCalibrator(mhist, Q) = BinnedCalibrator(mhist, Q, zero(Float64))
+DiscretizedAffineEstimator(mhist, Q) = DiscretizedAffineEstimator(mhist, Q, Base.zero(Float64))
 
-function (calib::BinnedCalibrator)(x)
+function DiscretizedAffineEstimator(mhist::MCEBHistogram, F::Function)
+    Q = zeros(Float64, length(mhist.grid) + 1)
+    Q[2:(end-1)] = F.(midpoints(mhist))
+    DiscretizedAffineEstimator(mhist, Q)
+end
+
+function (calib::DiscretizedAffineEstimator)(x)
     idxs = StatsBase.binindex(calib.mhist, x)
     calib.Q[idxs] + calib.Qo
+end
+
+
+
+function _get_plot_x(affine::DiscretizedAffineEstimator)
+    x = midpoints(affine.mhist.grid)
+end
+
+function _get_plot_y(affine::DiscretizedAffineEstimator)
+    y = affine.Q[2:(end-1)] .+ affine.Qo
+end
+
+
+@recipe function f(affine::DiscretizedAffineEstimator)
+    seriestype  -->  :path
+    _get_plot_x(affine), _get_plot_y(affine)
+end
+
+@recipe function f(affines::Vector{<:DiscretizedAffineEstimator})
+    seriestype  -->  :path
+    # TODO: Check this is the same for all of them.
+    x = _get_plot_x(affines[1])
+    y = hcat(_get_plot_y.(affines)...)
+    x,y
 end
