@@ -1,7 +1,18 @@
 # helper functions and types to deal with the fact that we are discretizing the output variables.
-struct MCEBHistogram{S<:StepRangeLen, H<:Histogram}
+
+struct MCEBHistogram{S<:StepRangeLen, H<:Histogram, T}
     grid::S
     hist::H
+    infty_bound::T
+    max_bias::T
+    η_infl::T
+end
+
+function MCEBHistogram(grid, hist;
+                       infty_bound = Inf,
+                       max_bias = 0.0,
+                       η_infl =  0.01)
+    MCEBHistogram(grid, hist, infty_bound, max_bias, η_infl)
 end
 
 function MCEBHistogram(grid::StepRangeLen)
@@ -53,6 +64,13 @@ function (calib::DiscretizedAffineEstimator)(x)
 end
 
 
+function _get_plot_x(mhist::MCEBHistogram)
+    x = midpoints(mhist.grid)
+end
+
+function _get_plot_y(mhist::MCEBHistogram)
+    y = pdf(mhist)[2:(end-1)]
+end
 
 function _get_plot_x(affine::DiscretizedAffineEstimator)
     x = midpoints(affine.mhist.grid)
@@ -73,5 +91,36 @@ end
     # TODO: Check this is the same for all of them.
     x = _get_plot_x(affines[1])
     y = hcat(_get_plot_y.(affines)...)
+    x,y
+end
+
+
+@recipe function f(mhist::MCEBHistogram;
+                        show_bands=true,
+                        as_density=false)
+    x = MinimaxCalibratedEBayes._get_plot_x(mhist)
+    y = MinimaxCalibratedEBayes._get_plot_y(mhist)
+    infty_bound = mhist.infty_bound
+    h = step(margin_nn2)
+
+    if as_density
+        x = x ./ h
+        y = y ./ h
+        infty_bound = infty_bound ./ h
+        ylab --> "Density"
+    else
+        ylab --> "Probability"
+    end
+
+    seriestype  -->  :path
+
+    if show_bands
+        lower_lims = y .- max.(y .- infty_bound, 0)
+        upper_lims = infty_bound
+        ribbons --> (lower_lims, upper_lims)
+        fillalpha --> 0.2
+    end
+
+    xlab --> "x"
     x,y
 end

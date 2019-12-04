@@ -31,6 +31,8 @@ include("marginalize.jl")
 export MCEBHistogram,
        DiscretizedStandardNormalSample,
        DiscretizedAffineEstimator,
-       marginalize
+       marginalize,
+       SincKernel,
+       DeLaValleePoussinKernel
 
 end # module

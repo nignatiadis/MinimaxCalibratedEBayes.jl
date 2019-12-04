@@ -10,14 +10,16 @@ end
 function marginalize(prior::Normal, Z::DiscretizedStandardNormalSample)
     marginal_normal = marginalize(prior, StandardNormalSample(response(Z)))
 
-    mhist = deepcopy(Z.mhist)
-    hist = mhist.hist
+    grid = Z.mhist.grid
+    hist = deepcopy(Z.mhist.hist)
 
-    hist.weights[1] = cdf(marginal_normal,  first(mhist))
-    hist.weights[end] = ccdf(marginal_normal, last(mhist))
+    hist.weights[1] = cdf(marginal_normal,  first(grid))
+    hist.weights[end] = ccdf(marginal_normal, last(grid))
 
-    for i=2:length(mhist.grid)
-        hist.weights[i] = cdf(marginal_normal, mhist.grid[i]) -  cdf(marginal_normal, mhist.grid[i-1])
+    for i=2:length(grid)
+        hist.weights[i] = cdf(marginal_normal, grid[i]) -  cdf(marginal_normal, grid[i-1])
+        #TODO: add sanity check that this is approx. h*density
     end
-    mhist
+
+    MCEBHistogram(grid, hist, infty_bound = 0.0)
 end
