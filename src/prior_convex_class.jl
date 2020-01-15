@@ -11,24 +11,36 @@ mutable struct GaussianMixturePriorClass{T<:Real,
 end
 
 GaussianMixturePriorClass(σ_prior, grid) = GaussianMixturePriorClass(σ_prior, grid, Gurobi.Optimizer)
-#function GaussianMixturePriorClass(σ_prior, grid)
-#    GaussianMixturePriorClass(σ_prior, grid, [], Matrix{eltype(σ_prior)}(undef, 0, 0))
-#end
+
 length(gmix_class::GaussianMixturePriorClass) = length(gmix_class.grid)
 
 
 
 function add_prior_variables!(model, gmix_class::GaussianMixturePriorClass; var_name = "πs") # adds constraints
     n_priors = length(gmix_class)
-    tmp_vars = @variable(model, [i=1:n])
+    tmp_vars = @variable(model, [i=1:n_priors])
     model[Symbol(var_name)] = tmp_vars
     set_lower_bound.(tmp_vars, 0.0)
     con = @constraint(model, sum(tmp_vars) == 1.0)
-    model
+    tmp_vars
 end
 
-function marginalize(cvx_prior_class, mhist, param_vec) #-> A*param_vec
-    A_mat = 
+function marginalize(gmix_class::GaussianMixturePriorClass,
+                     z::DiscretizedStandardNormalSample,
+                     param_vec) #-> A*param_vec
+    σ_prior = gmix_class.σ_prior
+    grid = gmix_class.grid
+    A_mat = hcat([ pdf(marginalize(Normal(μ, σ_prior), z)) for μ in grid]...)
+    A_mat*param_vec
+end
+
+function linear_functional(gmix_class::GaussianMixturePriorClass,
+                           target::EBayesTarget,
+                           param_vec)
+    σ_prior = gmix_class.σ_prior
+    grid = gmix_class.grid
+    v = [ target(Normal(μ, σ_prior)) for μ in grid]
+    dot(v, param_vec)
 end
 
 
@@ -41,30 +53,32 @@ end
 
 
 
-function worst_case_bias(Q::BinnedCalibrator,
+function worst_case_bias(Q::DiscretizedAffineEstimator,
                   Z::DiscretizedStandardNormalSample,
                   gmix_class::GaussianMixturePriorClass,
-                  target = LFSRNumerator(2.0);
+                  target::EBayesTarget;
                   maximization=true)
 
     model = Model(with_optimizer(gmix_class.solver))
-    add_prior_variables!(model, gmix_class; var_name = "πs")
-
+    πs = add_prior_variables!(model, gmix_class; var_name = "πs")
+    fs = marginalize(gmix_class, Z, πs)
+    L = linear_functional(gmix_class, target, πs)
     #if (C < Inf)
     #    @constraint(jm, f3 .- f_marginal .<= C*h_marginal_grid)
     #    @constraint(jm, f3 .- f_marginal .>= -C*h_marginal_grid)
     #end
 
     if maximization
-        @objective(jm, Max, Q.Qo + dot(Q.Q,f3)-dot(L,π3))
+        @objective(model, Max, Q.Qo + dot(Q.Q,fs)-L)
     else
-        @objective(jm, Min, Q.Qo + dot(Q.Q,f3)-dot(L,π3))
+        @objective(model, Min, Q.Qo + dot(Q.Q,fs)-L)
     end
 
-    status = solve(jm)
-
-    t_curr = getobjectivevalue(jm)
+    optimize!(model)
+    obj_val = objective_value(model)
+    model, obj_val
 end
+
 
 
 

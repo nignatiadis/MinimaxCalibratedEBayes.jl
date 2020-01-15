@@ -20,7 +20,19 @@ function riesz_representer(target::MarginalDensityTarget{<:StandardNormalSample}
 end
 
 
+struct PriorDensityTarget <: LinearEBayesTarget
+    x::Float64
+end
 
+location(target::PriorDensityTarget) = target.x
+
+function cf(target::PriorDensityTarget, t)
+    exp(im*location(target)*t)
+end
+
+function (target::PriorDensityTarget)(prior::Distribution)
+    pdf(prior, location(target))
+end
 #abstract type PosteriorNumeratorTarget <: LinearInferenceTarget end
 
 

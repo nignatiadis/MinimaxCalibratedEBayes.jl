@@ -1,6 +1,6 @@
 struct ButuceaComte{T<:EBayesTarget}
     target::EBayesTarget
-    h::Float64
+    h::Float64 # not really bandwidth -> truncation limit...
 end
 
 function default_bandwidth(::Type{ButuceaComte},
@@ -8,6 +8,16 @@ function default_bandwidth(::Type{ButuceaComte},
                            n)
     sqrt(log(n))
 end
+
+function default_bandwidth(::Type{ButuceaComte},
+                           target::PriorDensityTarget,
+                           n)
+    # should make this also depend on noise distribution etc ...
+    # π*m_n  = (log(n)/(2α + 1))^{1/ρ}
+    #gaussian case α=1//2, ρ=2
+    sqrt(log(n)/2)
+end
+
 
 function ButuceaComte(target::EBayesTarget, h::Float64)
     ButuceaComte{typeof(target)}(target, h)

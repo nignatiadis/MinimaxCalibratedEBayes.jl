@@ -8,6 +8,8 @@ using Reexport
 
 using RecipesBase
 using QuadGK
+using JuMP
+using LinearAlgebra
 
 import StatsBase:Histogram,
                  binindex,
@@ -31,9 +33,10 @@ import Base.Broadcast: broadcastable
 
 include("marginal_binning.jl")
 include("marginal_kde.jl")
-include("marginalize.jl")
 include("inference_targets.jl")
+include("normal_rules.jl")
 include("butucea_comte.jl")
+include("prior_convex_class.jl")
 
 
 export MCEBHistogram,
@@ -44,7 +47,10 @@ export MCEBHistogram,
        DeLaValleePoussinKernel,
        EBayesTarget,
        MarginalDensityTarget,
+       PriorDensityTarget,
        riesz_representer,
-       ButuceaComte
+       ButuceaComte,
+       GaussianMixturePriorClass,
+       worst_case_bias
 
 end # module

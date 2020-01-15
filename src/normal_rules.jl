@@ -31,3 +31,8 @@ function marginalize(prior::Normal, Z::DiscretizedStandardNormalSample)
 
     MCEBHistogram(grid, hist, infty_bound = 0.0)
 end
+
+function (target::MarginalDensityTarget{<:StandardNormalSample})(prior::Normal)
+    x = response(location(target)) #ok this notation is not nice...
+    pdf(marginalize(prior, StandardNormalSample(0.0)), x)
+end
