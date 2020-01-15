@@ -33,7 +33,7 @@ pdf(mh::MCEBHistogram) = mh.hist.weights
 midpoints(mh::MCEBHistogram) = midpoints(mh.grid)
 
 struct DiscretizedStandardNormalSample{T <: Number, MH<:MCEBHistogram} <: EBayesSample{T}
-    Z::T
+    Z::T    
     mhist::MH
 end
 
@@ -42,6 +42,8 @@ var(s::DiscretizedStandardNormalSample) = 1
 
 eltype(s::DiscretizedStandardNormalSample{T}) where T = T
 zero(s::DiscretizedStandardNormalSample{T}) where T = zero(T)
+
+pdf(s::DiscretizedStandardNormalSample) = pdf(s.mhist)
 
 
 struct DiscretizedAffineEstimator{MH<:MCEBHistogram}
@@ -62,6 +64,7 @@ function (calib::DiscretizedAffineEstimator)(x)
     idxs = StatsBase.binindex(calib.mhist, x)
     calib.Q[idxs] + calib.Qo
 end
+
 
 
 function _get_plot_x(mhist::MCEBHistogram)

@@ -32,7 +32,33 @@ function marginalize(prior::Normal, Z::DiscretizedStandardNormalSample)
     MCEBHistogram(grid, hist, infty_bound = 0.0)
 end
 
+# Normal: MarginalDensityTarget
+
 function (target::MarginalDensityTarget{<:StandardNormalSample})(prior::Normal)
     x = response(location(target)) #ok this notation is not nice...
     pdf(marginalize(prior, StandardNormalSample(0.0)), x)
 end
+
+function cf(target::MarginalDensityTarget{<:StandardNormalSample}, t)
+    error_dbn = Normal(response(location(target))) #TODO...
+    cf(error_dbn, t)
+end
+
+function riesz_representer(target::MarginalDensityTarget{<:StandardNormalSample}, t)
+    error_dbn = Normal(response(location(target))) #TODO...
+    pdf(error_dbn, t)
+end
+
+# Normal: PosteriorMeanTarget
+
+# Normal: LocalFalseSignRate
+
+
+
+
+#σ = std(dist)
+#μ = mean(dist)
+#(isfinite(σ) && isfinite(μ)) || throw(ArgumentError("Parameters σ, μ must be finite."))
+#gh = gausshermite(n)
+#nodes = gh[1].*(sqrt(2)*(σ)) .+ μ
+#weights = gh[2]./sqrt(pi)

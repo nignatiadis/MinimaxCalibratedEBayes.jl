@@ -10,9 +10,11 @@ mutable struct GaussianMixturePriorClass{T<:Real,
     solver
 end
 
+
 GaussianMixturePriorClass(σ_prior, grid) = GaussianMixturePriorClass(σ_prior, grid, Gurobi.Optimizer)
 
 length(gmix_class::GaussianMixturePriorClass) = length(gmix_class.grid)
+location(gmix_class::GaussianMixturePriorClass) = gmix_class.grid
 
 
 
@@ -43,6 +45,13 @@ function linear_functional(gmix_class::GaussianMixturePriorClass,
     dot(v, param_vec)
 end
 
+function (gmix_class::GaussianMixturePriorClass)(param_vec)
+    σ_prior = gmix_class.σ_prior
+    grid = gmix_class.grid
+    #TODO: check param_vec is probability vector
+    MixtureModel(Normal, [(μ, σ_prior) for μ in grid], param_vec)
+end
+
 
 # In fact all computations with marginalized object.
 
@@ -69,16 +78,55 @@ function worst_case_bias(Q::DiscretizedAffineEstimator,
     #end
 
     if maximization
-        @objective(model, Max, Q.Qo + dot(Q.Q,fs)-L)
+        @objective(model, Max, Q.Qo + dot(Q.Q,fs) - L)
     else
-        @objective(model, Min, Q.Qo + dot(Q.Q,fs)-L)
+        @objective(model, Min, Q.Qo + dot(Q.Q,fs) - L)
     end
 
     optimize!(model)
     obj_val = objective_value(model)
-    model, obj_val
+
+    (max_worst_g = gmix_class(JuMP.value.(πs)),
+     max_bias = obj_val)
 end
 
+
+
+function modulus_problem(Z::DiscretizedStandardNormalSample,
+                        gmix_class::GaussianMixturePriorClass,
+                        target::EBayesTarget,
+                        δ::Float64)
+
+    model = Model(with_optimizer(gmix_class.solver))
+    πs1 = add_prior_variables!(model, gmix_class; var_name = "πs1")
+    πs2 = add_prior_variables!(model, gmix_class; var_name = "πs2")
+
+    fs1 = marginalize(gmix_class, Z, πs1)
+    fs2 = marginalize(gmix_class, Z, πs2)
+
+    f̄s = pdf(Z)# pdf(Z) #
+
+    L1 = linear_functional(gmix_class, target, πs1)
+    L2 = linear_functional(gmix_class, target, πs2)
+
+    #pseudo_chisq_dist = sum( (fs1 .- fs2).^2)
+    #@constraint(model, pseudo_chisq_dist <= δ)
+    @constraint(model, blabla, [δ; fs1-fs2] in SecondOrderCone())
+
+    #if (C < Inf)
+    #    @constraint(jm, f3 .- f_marginal .<= C*h_marginal_grid)
+    #    @constraint(jm, f3 .- f_marginal .>= -C*h_marginal_grid)
+    #end
+
+    @objective(model, Max, L2 - L1)
+
+    optimize!(model)
+    obj_val = objective_value(model)
+
+    (g1 = gmix_class(JuMP.value.(πs1)),
+     g2 = gmix_class(JuMP.value.(πs2)),
+     obj_val = obj_val)
+end
 
 
 

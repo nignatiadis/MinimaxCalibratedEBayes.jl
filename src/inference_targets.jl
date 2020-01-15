@@ -1,5 +1,9 @@
 abstract type EBayesTarget end
 
+# maybe have a distinction between 1D EBayes Target and 2D.
+
+
+
 abstract type LinearEBayesTarget <: EBayesTarget end
 
 struct MarginalDensityTarget{NS <: StandardNormalSample} <: LinearEBayesTarget
@@ -9,15 +13,7 @@ end
 location(target::MarginalDensityTarget) = target.Z
 
 # introduce -> error_distribution();
-function cf(target::MarginalDensityTarget{<:StandardNormalSample}, t)
-    error_dbn = Normal(response(location(target))) #TODO...
-    cf(error_dbn, t)
-end
 
-function riesz_representer(target::MarginalDensityTarget{<:StandardNormalSample}, t)
-    error_dbn = Normal(response(location(target))) #TODO...
-    pdf(error_dbn, t)
-end
 
 
 struct PriorDensityTarget <: LinearEBayesTarget
