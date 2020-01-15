@@ -7,14 +7,18 @@ using Reexport
                 EBayes
 
 using RecipesBase
+using QuadGK
 
 import StatsBase:Histogram,
                  binindex,
-                 midpoints
+                 midpoints,
+                 response
 
 import Statistics:var
 
-import Distributions:cf, pdf
+import Distributions:cf,
+                     pdf,
+                     location
 
 import Base:step,
             first,
@@ -24,15 +28,23 @@ import Base:step,
 
 import Base.Broadcast: broadcastable
 
+
 include("marginal_binning.jl")
 include("marginal_kde.jl")
 include("marginalize.jl")
+include("inference_targets.jl")
+include("butucea_comte.jl")
+
 
 export MCEBHistogram,
        DiscretizedStandardNormalSample,
        DiscretizedAffineEstimator,
        marginalize,
        SincKernel,
-       DeLaValleePoussinKernel
+       DeLaValleePoussinKernel,
+       EBayesTarget,
+       MarginalDensityTarget,
+       riesz_representer,
+       ButuceaComte
 
 end # module

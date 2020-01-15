@@ -28,7 +28,7 @@ function add_prior_variables!(model, gmix_class::GaussianMixturePriorClass; var_
 end
 
 function marginalize(cvx_prior_class, mhist, param_vec) #-> A*param_vec
-
+    A_mat = 
 end
 
 
@@ -95,4 +95,3 @@ end
 
 #    check_bias(Q, ds, f, m, target; C=C, maximization=maximization)
 #end
-

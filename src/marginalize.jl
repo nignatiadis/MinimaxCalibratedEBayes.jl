@@ -1,3 +1,11 @@
+
+# marginalize:
+## Normal (Distribution), NormalSample -> Normal distribution
+## Normal (Distribution), DiscretizedNormalSample -> MCEBHistogram ...(?)
+## PriorConvexClass, DiscretizedNormalSample -> ...
+
+
+
 function marginalize(prior::Normal, Z::EBayes.AbstractNormalSample)
     prior_var = var(prior)
     prior_μ = mean(prior)
