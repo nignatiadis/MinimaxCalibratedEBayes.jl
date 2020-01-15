@@ -111,7 +111,10 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
 
     #pseudo_chisq_dist = sum( (fs1 .- fs2).^2)
     #@constraint(model, pseudo_chisq_dist <= δ)
-    @constraint(model, blabla, [δ; fs1-fs2] in SecondOrderCone())
+    @variable(model, δ_up)
+    @constraint(model, bound_delta, δ_up == δ)
+    @constraint(model, pseudo_chisq_constraint,
+              [δ_up; fs1-fs2] in SecondOrderCone())
 
     #if (C < Inf)
     #    @constraint(jm, f3 .- f_marginal .<= C*h_marginal_grid)
@@ -125,7 +128,8 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
 
     (g1 = gmix_class(JuMP.value.(πs1)),
      g2 = gmix_class(JuMP.value.(πs2)),
-     obj_val = obj_val)
+     obj_val = obj_val,
+     model = model)
 end
 
 
