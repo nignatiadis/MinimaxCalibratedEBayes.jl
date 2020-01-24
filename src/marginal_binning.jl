@@ -37,6 +37,11 @@ struct DiscretizedStandardNormalSample{T <: Number, MH<:MCEBHistogram} <: EBayes
     mhist::MH
 end
 
+DiscretizedStandardNormalSample(mhist) = DiscretizedStandardNormalSample(NaN, mhist)
+function DiscretizedStandardNormalSample(a::Number, grid::StepRangeLen)
+    DiscretizedStandardNormalSample(a, MCEBHistogram(grid))
+end
+
 response(s::DiscretizedStandardNormalSample) = s.Z
 var(s::DiscretizedStandardNormalSample) = 1
 
@@ -110,8 +115,8 @@ end
     h = step(mhist)
 
     if as_density
-        x = x ./ h
-        y = y ./ h
+        x = x
+        y = y ./ h #well... somewhat hacky.
         infty_bound = infty_bound ./ h
         ylab --> "Density"
     else

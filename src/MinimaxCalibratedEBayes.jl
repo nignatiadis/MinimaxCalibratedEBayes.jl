@@ -6,7 +6,7 @@ using Reexport
                 Distributions,
                 EBayes
 
-using RecipesBase
+using RecipesBase, Plots
 using QuadGK
 using JuMP
 using LinearAlgebra
@@ -52,6 +52,7 @@ export MCEBHistogram,
        ButuceaComte,
        GaussianMixturePriorClass,
        worst_case_bias,
-       SteinMinimaxEstimator
+       SteinMinimaxEstimator,
+       steinminimaxplot
 
 end # module

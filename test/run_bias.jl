@@ -5,22 +5,24 @@ using Test
 using Plots
 pgfplotsx()
 gr()
-grid = -3:0.03:3
+grid = -3:0.06:3
 length(grid)
 σ = 0.2
 gmix_tmp = GaussianMixturePriorClass(σ, grid, Gurobi.Optimizer)
 
 true_dist = MixtureModel(Normal, [(-2,.2), (+2,.2)])
 
+tupl = ( BarConvTol = 1e-12, BarQCPConvTol = 1e-12, FeasibilityTol = 1e-9, OptimalityTol = 1e-9)
 
-mhist =  MCEBHistogram(-6:0.02:6)
-length(mhist.grid)
-Z1 = DiscretizedStandardNormalSample(mhist)
-Z1 = DiscretizedStandardNormalSample(0.0, mhist)
+gmix_accurate =  GaussianMixturePriorClass(σ, grid,
+                                           Gurobi.Optimizer,
+                                           tupl)
+
+Z1 = DiscretizedStandardNormalSample(-6:1.0:6)
 
 mhist_mhist = marginalize(true_dist, Z1)
-step(mhist_mhist)
-pdf(mhist_mhist)[1:end] .= step(mhist_mhist)/1/sqrt(2*pi)# pdf(mhist_mhist) .+ 0.01
+pdf(mhist_mhist)[1:end] =  pdf(mhist_mhist) .+ quantile(pdf(mhist_mhist), 0.1)
+pdf(mhist_mhist) .+ 0.01
 Z2 = DiscretizedStandardNormalSample(0.0, mhist_mhist)
 
 plot(Z2)
@@ -28,23 +30,34 @@ plot(Z2)
 marginal_target = MarginalDensityTarget(StandardNormalSample(0.0))
 prior_target = PriorDensityTarget(0.0)
 
-δs = exp10.(range(-3.0, stop=-1.0, length=30))
+δs = exp10.(range(-3.0, stop=-1.0, length=70))
+δs = range(0.001, 0.2, length=50)
+
+δ = 0.001
+mm_1 = MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_tmp, prior_target, δ)
 
 
-mms = [MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_tmp, prior_target, δ) for δ in δs]
+mm_2 = MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_accurate, prior_target, δ)
 
+mms = [MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_accurate, marginal_target, δ) for δ in δs]
 
-var_mms = var.(mms)
-max_bias_squared_mms = worst_case_bias.(mms).^2
-mse_mms = var_mms + max_bias_squared_mms
+mms[1]
+var_mms = sqrt.(var.(mms))
+max_bias_squared_mms = worst_case_bias.(mms)
+mse_mms = sqrt.( var_mms.^2 .+ max_bias_squared_mms.^2)
 
-plot(δs, [var_mms max_bias_squared_mms mse_mms],
-                     xscale = :log10,
+using LaTeXStrings
+using Plots
+gr()
+plot(sqrt.(δs), [var_mms max_bias_squared_mms mse_mms],
+                     seriestype = :path,
+                     xlabel = L"\delta",
+                     linewidth=4.0,
                      color=["orange" "purple" "black"],
                      label=["variance" "max_bias_squared" "mse"])
 
-plot(mms[22].Q)
-
+pl = steinminimaxplot(mms[3])
+pl1!
 
 
 
@@ -52,10 +65,6 @@ plot(mms[22].Q)
 δp = 0.021
 mm = MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_tmp, prior_target, δ)
 
-StatsBase.var(sme::SteinMinimaxEstimator) = sme.unit_var_proxy/sme.n
-function MinimaxCalibratedEBayes.worst_case_bias(sme::SteinMinimaxEstimator)
-    sm.max_bias
-end
 
 plot(mm.Q)
 
@@ -65,6 +74,16 @@ worst_case_bias(mm)^2
 
 
 
+mycols=["#424395" "#018AC4" "#5EC2DA" "#EBC915" "#EB549A" "#550133"]
+
+
+
+plot(marginalize(mms[1].g1, mms[1].Z))
+
+pyplot()
+pl =steinminimaxplot(mms[30])
+plot!(pl[2])
+pl
 
 mm_δp = MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_tmp, prior_target, δp)
 
@@ -173,44 +192,6 @@ plot(-5:0.01:5, x->pdf(mm2[:g1],x))
 plot!(-5:0.01:5, x->pdf(mm2[:g2],x), color="red")
 
 
-m = Model(with_optimizer(gmix_tmp.solver))
-
-m[:bla] = 1.0
-
-m[:bla]
-
-function add_prior_variables!(model, gmix_class::GaussianMixturePriorClass; var_name = "πs") # adds constraints
-    n_priors = Base.length(gmix_class)
-    tmp_vars = @variable(model, [i=1:n_priors])
-    model[Symbol(var_name)] = tmp_vars
-    set_lower_bound.(tmp_vars, 0.0)
-    con = @constraint(model, sum(tmp_vars) == 1.0)
-    tmp_vars
-end
-
-g1 = add_prior_variables!(m, gmix_tmp)
-g2 = add_prior_variables!(m, gmix_tmp; var_name="πs2")
-
-A = rand(121,121)
-f1 = A*g1
-f2 = A*g2
-
-
-@constraint(m, blabla, [0.1; f1-f2] in SecondOrderCone())
-
-obj = LinearAlgebra.norm( (f1 - f2))
-obj2 = sum( (f1 - f2).^2)
-obj == obj2
-@constraint(m, obj <= 0.1)
-
-sum(f1)
-
-set_lower_bound(g1[1],3.0)
-
-σ_prior = tmp.σ_prior
-grid = tmp.grid
-
-z
 
 
 # In fact all computations with marginalized object.

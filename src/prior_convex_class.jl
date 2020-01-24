@@ -8,9 +8,10 @@ mutable struct GaussianMixturePriorClass{T<:Real,
     σ_prior::Float64
     grid::VT
     solver
+    solver_params
 end
 
-
+GaussianMixturePriorClass(σ_prior, grid, solver) = GaussianMixturePriorClass(σ_prior, grid, solver, ())
 GaussianMixturePriorClass(σ_prior, grid) = GaussianMixturePriorClass(σ_prior, grid, Gurobi.Optimizer)
 
 length(gmix_class::GaussianMixturePriorClass) = length(gmix_class.grid)
@@ -68,7 +69,7 @@ function worst_case_bias(Q::DiscretizedAffineEstimator,
                   target::EBayesTarget;
                   maximization=true)
 
-    model = Model(with_optimizer(gmix_class.solver))
+    model = Model(with_optimizer(gmix_class.solver; gmix_class.solver_params...))
     πs = add_prior_variables!(model, gmix_class; var_name = "πs")
     fs = marginalize(gmix_class, Z, πs)
     L = linear_functional(gmix_class, target, πs)
@@ -120,7 +121,7 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
                         δ::Float64;
                         n=10_000)
 
-    model = Model(with_optimizer(prior_class.solver))
+    model = Model(with_optimizer(prior_class.solver; prior_class.solver_params...))
     πs1 = add_prior_variables!(model, prior_class; var_name = "πs1")
     πs2 = add_prior_variables!(model, prior_class; var_name = "πs2")
 
@@ -182,16 +183,57 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
                           model=model)
 end
 
+var(sme::SteinMinimaxEstimator) = sme.unit_var_proxy/sme.n
+function worst_case_bias(sme::SteinMinimaxEstimator)
+    sme.max_bias
+end
 
 
+@userplot SteinMinimaxPlot
+
+@recipe function f(h::SteinMinimaxPlot; x_grid = -5:0.01:5)
+
+    sme = first(h.args)
+    layout := @layout [panel1 panel2 panel3]
+
+    # main histogram2d
+    @series begin
+        seriestype := :path
+        subplot := 1
+        #xlim := extrema(x_grid)
+        sme.Q
+    end
+
+    # upper histogram
+    g1 = sme.g1
+    g2 = sme.g2
+    g1_xs = pdf.(g1, x_grid)
+    g2_xs = pdf.(g2, x_grid)
+    @series begin
+        seriestype := :path
+        subplot := 2
+        linecolor --> [:pink :purple]
+        label := ["g1" "g2"]
+        x_grid, [g1_xs g2_xs]
+    end
 
 
+    Z=sme.Z
+    Z_continuous = StandardNormalSample(0.0)
 
+    f1=marginalize(g1, Z_continuous)
+    f2=marginalize(g2, Z_continuous)
 
+    f1_xs=pdf.(f1, x_grid)
+    f2_xs=pdf.(f2, x_grid)
 
-
-
-
+    @series begin
+        seriestype := :path
+        subplot := 3
+        linecolor --> [:orange :brown]
+        x_grid, [f1_xs f2_xs]
+    end
+end
 
 
 
