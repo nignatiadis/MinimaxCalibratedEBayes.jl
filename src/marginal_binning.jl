@@ -33,7 +33,7 @@ pdf(mh::MCEBHistogram) = mh.hist.weights
 midpoints(mh::MCEBHistogram) = midpoints(mh.grid)
 
 struct DiscretizedStandardNormalSample{T <: Number, MH<:MCEBHistogram} <: EBayesSample{T}
-    Z::T    
+    Z::T
     mhist::MH
 end
 
@@ -51,6 +51,9 @@ struct DiscretizedAffineEstimator{MH<:MCEBHistogram}
     Q::Vector{Float64}
     Qo::Float64 #offset
 end
+
+
+DiscretizedAffineEstimator(Z::DiscretizedStandardNormalSample, args...) = DiscretizedAffineEstimator(Z.mhist, args...)
 
 DiscretizedAffineEstimator(mhist, Q) = DiscretizedAffineEstimator(mhist, Q, Base.zero(Float64))
 
@@ -104,7 +107,7 @@ end
     x = MinimaxCalibratedEBayes._get_plot_x(mhist)
     y = MinimaxCalibratedEBayes._get_plot_y(mhist)
     infty_bound = mhist.infty_bound
-    h = step(margin_nn2)
+    h = step(mhist)
 
     if as_density
         x = x ./ h

@@ -41,7 +41,7 @@ function linear_functional(gmix_class::GaussianMixturePriorClass,
                            param_vec)
     σ_prior = gmix_class.σ_prior
     grid = gmix_class.grid
-    v = [ target(Normal(μ, σ_prior)) for μ in grid]
+    v = [target(Normal(μ, σ_prior)) for μ in grid]
     dot(v, param_vec)
 end
 
@@ -91,7 +91,13 @@ function worst_case_bias(Q::DiscretizedAffineEstimator,
 end
 
 
+#function initialize_modulus_problem( )
 
+#nd
+
+#function optimize!(modulus_problem, Z, gmix_class, target, δ)
+
+#end
 function modulus_problem(Z::DiscretizedStandardNormalSample,
                         gmix_class::GaussianMixturePriorClass,
                         target::EBayesTarget,
@@ -104,7 +110,7 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
     fs1 = marginalize(gmix_class, Z, πs1)
     fs2 = marginalize(gmix_class, Z, πs2)
 
-    f̄s = pdf(Z)# pdf(Z) #
+    f̄s_sqrt = sqrt.(pdf(Z))# pdf(Z) #
 
     L1 = linear_functional(gmix_class, target, πs1)
     L2 = linear_functional(gmix_class, target, πs2)
@@ -114,7 +120,7 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
     @variable(model, δ_up)
     @constraint(model, bound_delta, δ_up == δ)
     @constraint(model, pseudo_chisq_constraint,
-              [δ_up; fs1-fs2] in SecondOrderCone())
+              [δ_up; (fs1 .- fs2)./f̄s_sqrt] in SecondOrderCone())
 
     #if (C < Inf)
     #    @constraint(jm, f3 .- f_marginal .<= C*h_marginal_grid)
@@ -128,6 +134,8 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
 
     (g1 = gmix_class(JuMP.value.(πs1)),
      g2 = gmix_class(JuMP.value.(πs2)),
+     L1 = JuMP.value(L1),
+     L2 = JuMP.value(L2),
      obj_val = obj_val,
      model = model)
 end

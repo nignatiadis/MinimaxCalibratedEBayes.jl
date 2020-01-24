@@ -14,8 +14,16 @@ function marginalize(prior::Normal, Z::EBayes.AbstractNormalSample)
     Normal(prior_μ, marginal_σ)
 end
 
+function marginalize(prior::MixtureModel, Z::EBayes.AbstractNormalSample)
+    prior_probs = probs(prior)
+    marginal_components = marginalize.(components(prior), Ref(Z))
+    MixtureModel(marginal_components, prior_probs)
+end
 
-function marginalize(prior::Normal, Z::DiscretizedStandardNormalSample)
+const NormalOrNormalMixture = Union{Normal,
+    MixtureModel{Univariate, Continuous, Normal}}
+
+function marginalize(prior::NormalOrNormalMixture, Z::DiscretizedStandardNormalSample)
     marginal_normal = marginalize(prior, StandardNormalSample(response(Z)))
 
     grid = Z.mhist.grid
@@ -48,6 +56,7 @@ function riesz_representer(target::MarginalDensityTarget{<:StandardNormalSample}
     error_dbn = Normal(response(location(target))) #TODO...
     pdf(error_dbn, t)
 end
+
 
 # Normal: PosteriorMeanTarget
 
