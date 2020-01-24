@@ -51,6 +51,7 @@ export MCEBHistogram,
        riesz_representer,
        ButuceaComte,
        GaussianMixturePriorClass,
-       worst_case_bias
+       worst_case_bias,
+       SteinMinimaxEstimator
 
 end # module

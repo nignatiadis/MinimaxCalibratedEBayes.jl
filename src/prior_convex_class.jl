@@ -98,22 +98,39 @@ end
 #function optimize!(modulus_problem, Z, gmix_class, target, δ)
 
 #end
+Base.@kwdef mutable struct SteinMinimaxEstimator
+                Z::DiscretizedStandardNormalSample
+                prior_class::ConvexPriorClass
+                target::EBayesTarget
+                δ::Float64
+                ω_δ::Float64
+                ω_δ_prime::Float64
+                g1
+                g2
+                Q::DiscretizedAffineEstimator
+                max_bias::Float64
+                unit_var_proxy::Float64
+                n::Int
+                model
+end
+
 function modulus_problem(Z::DiscretizedStandardNormalSample,
-                        gmix_class::GaussianMixturePriorClass,
+                        prior_class::GaussianMixturePriorClass,
                         target::EBayesTarget,
-                        δ::Float64)
+                        δ::Float64;
+                        n=10_000)
 
-    model = Model(with_optimizer(gmix_class.solver))
-    πs1 = add_prior_variables!(model, gmix_class; var_name = "πs1")
-    πs2 = add_prior_variables!(model, gmix_class; var_name = "πs2")
+    model = Model(with_optimizer(prior_class.solver))
+    πs1 = add_prior_variables!(model, prior_class; var_name = "πs1")
+    πs2 = add_prior_variables!(model, prior_class; var_name = "πs2")
 
-    fs1 = marginalize(gmix_class, Z, πs1)
-    fs2 = marginalize(gmix_class, Z, πs2)
+    fs1 = marginalize(prior_class, Z, πs1)
+    fs2 = marginalize(prior_class, Z, πs2)
 
     f̄s_sqrt = sqrt.(pdf(Z))# pdf(Z) #
 
-    L1 = linear_functional(gmix_class, target, πs1)
-    L2 = linear_functional(gmix_class, target, πs2)
+    L1 = linear_functional(prior_class, target, πs1)
+    L2 = linear_functional(prior_class, target, πs2)
 
     #pseudo_chisq_dist = sum( (fs1 .- fs2).^2)
     #@constraint(model, pseudo_chisq_dist <= δ)
@@ -130,20 +147,54 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
     @objective(model, Max, L2 - L1)
 
     optimize!(model)
-    obj_val = objective_value(model)
+    ω_δ = objective_value(model)
+    ω_δ_prime = -JuMP.dual(model[:bound_delta])
 
-    (g1 = gmix_class(JuMP.value.(πs1)),
-     g2 = gmix_class(JuMP.value.(πs2)),
-     L1 = JuMP.value(L1),
-     L2 = JuMP.value(L2),
-     obj_val = obj_val,
-     model = model)
+    g1 = prior_class(JuMP.value.(πs1))
+    g2 = prior_class(JuMP.value.(πs2))
+    L1 = JuMP.value(L1)
+    L2 = JuMP.value(L2)
+
+    #construct estimator
+    f1 = marginalize(g1, Z)
+    f2 = marginalize(g2, Z)
+
+    Q = ω_δ_prime/δ*(pdf(f2) .- pdf(f1))./pdf(Z)
+    Q_0  = (L1+L2)/2 -
+           ω_δ_prime/(2*δ)*sum( (pdf(f2) .- pdf(f1)).* (pdf(f2) .+ pdf(f1)) ./ pdf(Z))
+
+    stein = DiscretizedAffineEstimator(Z, Q, Q_0)
+    max_bias = (ω_δ - δ*ω_δ_prime)/2
+    unit_var_proxy = ω_δ_prime^2
+
+    SteinMinimaxEstimator(Z=Z,
+                          prior_class=prior_class,
+                          target=target,
+                          δ=δ,
+                          ω_δ=ω_δ,
+                          ω_δ_prime=ω_δ_prime,
+                          g1=g1,
+                          g2=g2,
+                          Q=stein,
+                          max_bias=max_bias,
+                          unit_var_proxy=unit_var_proxy,
+                          n=n,
+                          model=model)
 end
 
 
 
-# way to define optim representation
-#
+
+
+
+
+
+
+
+
+
+
+
 
 ##marginal_pdf(gm_class, params) ->  #
 

@@ -5,19 +5,17 @@ using Test
 using Plots
 pgfplotsx()
 gr()
-grid = -3:0.01:3
+grid = -3:0.03:3
 length(grid)
 σ = 0.2
 gmix_tmp = GaussianMixturePriorClass(σ, grid, Gurobi.Optimizer)
 
 true_dist = MixtureModel(Normal, [(-2,.2), (+2,.2)])
 
-isa(true_dist, MinimaxCalibratedEBayes.NormalOrNormalMixture)
-
-isa(true_dist,MixtureModel{Univariate, Continuous, Normal{T}} where T)
 
 mhist =  MCEBHistogram(-6:0.02:6)
 length(mhist.grid)
+Z1 = DiscretizedStandardNormalSample(mhist)
 Z1 = DiscretizedStandardNormalSample(0.0, mhist)
 
 mhist_mhist = marginalize(true_dist, Z1)
@@ -30,13 +28,51 @@ plot(Z2)
 marginal_target = MarginalDensityTarget(StandardNormalSample(0.0))
 prior_target = PriorDensityTarget(0.0)
 
-δ = 0.02
+δs = exp10.(range(-3.0, stop=-1.0, length=30))
+
+
+mms = [MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_tmp, prior_target, δ) for δ in δs]
+
+
+var_mms = var.(mms)
+max_bias_squared_mms = worst_case_bias.(mms).^2
+mse_mms = var_mms + max_bias_squared_mms
+
+plot(δs, [var_mms max_bias_squared_mms mse_mms],
+                     xscale = :log10,
+                     color=["orange" "purple" "black"],
+                     label=["variance" "max_bias_squared" "mse"])
+
+plot(mms[22].Q)
+
+
+
+
+δ = 0.0001
 δp = 0.021
-mm2 = MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_tmp, marginal_target, δ)
-mm_δp = MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_tmp, marginal_target, δp)
+mm = MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_tmp, prior_target, δ)
+
+StatsBase.var(sme::SteinMinimaxEstimator) = sme.unit_var_proxy/sme.n
+function MinimaxCalibratedEBayes.worst_case_bias(sme::SteinMinimaxEstimator)
+    sm.max_bias
+end
+
+plot(mm.Q)
+
+var(mm)
+worst_case_bias(mm)^2
+
+
+
+
+
+mm_δp = MinimaxCalibratedEBayes.modulus_problem(Z2, gmix_tmp, prior_target, δp)
 
 g1 = mm2[:g1]
 g2 = mm2[:g2]
+
+plot(-3:0.01:3, x->pdf(mm2[:g1],x))
+plot!(-3:0.01:3, x->pdf(mm2[:g2],x))
 
 #f1_cont = marginalize(g1, StandardNormalSample(0.0))
 
@@ -49,6 +85,9 @@ plot!(f2, color="red")
 plot!(Z2.mhist, color="black")
 
 ω_δ_prime = -JuMP.dual(mm2[:model][:bound_delta])
+ω_δ = mm2[:obj_val]
+
+
 -JuMP.dual(mm_δp[:model][:bound_delta])
 
 mm2[:obj_val] .- mm_δp[:obj_val]
@@ -63,10 +102,15 @@ Q = ω_δ_prime/δ*(pdf(f2) .- pdf(f1))./pdf(Z2)
 Q_0  = (L1+L2)/2 - ω_δ_prime/(2*δ)*sum( (pdf(f2) .- pdf(f1)).* (pdf(f2) .+ pdf(f1)) ./ pdf(Z2))
 Q_0_prime  = (L1+L2)/2 - ω_δ_prime/2/δ*sum( (pdf(f2).^2 .- pdf(f1).^2) ./ pdf(Z2))
 
+stein_estimator = DiscretizedAffineEstimator(Z2, Q, Q_0)
+
+max_bias = (ω_δ - δ*ω_δ_prime)/2
+lp_worst_bias = worst_case_bias(stein_estimator, Z2, gmix_tmp, prior_target)
+max_bias/lp_worst_bias[:max_bias]
+
 plot(Q)
 
-tmp = DiscretizedAffineEstimator(Z2, Q, Q_0)
-plot(tmp, xlim=(-3.5,3.5))  
+plot(tmp, xlim=(-3.5,3.5))
 plot(grid(Z2), Q .+ Q_0)
 
 pdf(f2)[1:5]
@@ -90,8 +134,6 @@ L_mid = (L1 + L2)/2
 gr()
 plot(f2)
 plot!(f1, color="red")
-plot(-3:0.01:3, x->pdf(mm2[:g1],x))
-plot!(-3:0.01:3, x->pdf(mm2[:g2],x))
 
 
 
