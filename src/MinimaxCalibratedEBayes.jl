@@ -9,6 +9,7 @@ using Reexport
 using RecipesBase, Plots
 using QuadGK
 using JuMP
+using Roots
 using LinearAlgebra
 
 import StatsBase:Histogram,
@@ -37,6 +38,7 @@ include("inference_targets.jl")
 include("normal_rules.jl")
 include("butucea_comte.jl")
 include("prior_convex_class.jl")
+include("bias_adjusted_ci.jl")
 
 
 export MCEBHistogram,
