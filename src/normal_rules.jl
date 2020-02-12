@@ -40,6 +40,8 @@ function marginalize(prior::NormalOrNormalMixture, Z::DiscretizedStandardNormalS
     MCEBHistogram(grid, hist, infty_bound = 0.0)
 end
 
+
+
 # Normal: MarginalDensityTarget
 
 function (target::MarginalDensityTarget{<:StandardNormalSample})(prior::Normal)
@@ -58,7 +60,59 @@ function riesz_representer(target::MarginalDensityTarget{<:StandardNormalSample}
 end
 
 
+## Posterior of Normal DBN
+
+function _normal_normal_posterior(prior::Normal, Z::EBayes.AbstractNormalSample)
+    x = response(Z)
+    sigma_squared = var(Z)
+    prior_mu = mean(prior)
+    prior_A = var(prior)
+
+    post_mean = x*(prior_A)/(prior_A + sigma_squared) + sigma_squared/(prior_A + sigma_squared)*prior_mu
+    post_var = prior_A * sigma_squared / (prior_A + sigma_squared)
+    Normal(post_mean, sqrt(post_var))
+end
+
+
 # Normal: PosteriorMeanTarget
+
+function (target::MinimaxCalibratedEBayes.PosteriorMeanNumerator{<:StandardNormalSample})(prior::Normal)
+     Z = location(target)
+     _post = _normal_normal_posterior(prior, Z)
+     ratio = mean(_post)
+     denom = MarginalDensityTarget(Z)(prior)
+     ratio*denom
+end
+
+# Normal: LocalFalseSignRate
+
+
+function (target::MinimaxCalibratedEBayes.LFSRNumerator{<:StandardNormalSample})(prior::Normal)
+     Z = location(target)
+     _post = _normal_normal_posterior(prior, Z)
+     ratio = ccdf(_post, 0)
+     denom = MarginalDensityTarget(Z)(prior)
+     ratio*denom
+end
+
+
+#function (target::PosteriorMeanNumerator{<:StandardNormalSample})(prior::Normal)
+#    x = response(location(target)) #ok this notation is not nice...
+#    pdf(marginalize(prior, StandardNormalSample(0.0)), x)
+#end
+
+#function cf(target::MarginalDensityTarget{<:StandardNormalSample}, t)
+#    error_dbn = Normal(response(location(target))) #TODO...
+#    cf(error_dbn, t)
+#end
+
+#function riesz_representer(target::MarginalDensityTarget{<:StandardNormalSample}, t)
+#    error_dbn = Normal(response(location(target))) #TODO...
+#    pdf(error_dbn, t)
+#end
+
+
+
 
 # Normal: LocalFalseSignRate
 

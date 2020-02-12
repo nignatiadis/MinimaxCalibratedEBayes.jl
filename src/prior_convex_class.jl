@@ -3,6 +3,7 @@
 abstract type ConvexPriorClass end
 
 
+
 mutable struct GaussianMixturePriorClass{T<:Real,
                                          VT<:AbstractVector{T}} <: ConvexPriorClass
     σ_prior::Float64
@@ -115,11 +116,9 @@ Base.@kwdef mutable struct SteinMinimaxEstimator
                 model
 end
 
-function modulus_problem(Z::DiscretizedStandardNormalSample,
-                        prior_class::GaussianMixturePriorClass,
-                        target::EBayesTarget,
-                        δ::Float64;
-                        n=10_000)
+function initialize_modulus_problem(Z::DiscretizedStandardNormalSample,
+                                    prior_class::GaussianMixturePriorClass,
+                                    target::EBayesTarget)
 
     model = Model(with_optimizer(prior_class.solver; prior_class.solver_params...))
     πs1 = add_prior_variables!(model, prior_class; var_name = "πs1")
@@ -128,22 +127,106 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
     fs1 = marginalize(prior_class, Z, πs1)
     fs2 = marginalize(prior_class, Z, πs2)
 
-    f̄s_sqrt = sqrt.(pdf(Z))# pdf(Z) #
+    model[:fs1] = fs1
+    model[:fs2] = fs2
 
-    L1 = linear_functional(prior_class, target, πs1)
-    L2 = linear_functional(prior_class, target, πs2)
-
-    #pseudo_chisq_dist = sum( (fs1 .- fs2).^2)
-    #@constraint(model, pseudo_chisq_dist <= δ)
-    @variable(model, δ_up)
-    @constraint(model, bound_delta, δ_up == δ)
-    @constraint(model, pseudo_chisq_constraint,
-              [δ_up; (fs1 .- fs2)./f̄s_sqrt] in SecondOrderCone())
 
     #if (C < Inf)
     #    @constraint(jm, f3 .- f_marginal .<= C*h_marginal_grid)
     #    @constraint(jm, f3 .- f_marginal .>= -C*h_marginal_grid)
     #end
+
+    L1 = linear_functional(prior_class, target, πs1)
+    L2 = linear_functional(prior_class, target, πs2)
+
+    model[:L1] = L1
+    model[:L2] = L2
+
+    f̄s_sqrt = sqrt.(pdf(Z))
+    model[:f̄s_sqrt] = sqrt.(pdf(Z))
+                    #pseudo_chisq_dist = sum( (fs1 .- fs2).^2)
+                                        #@constraint(model, pseudo_chisq_dist <= δ)
+    @variable(model, δ_up)
+    model[:δ_up] = δ_up
+
+    Δf = (fs1 .- fs2)./f̄s_sqrt
+    model[:Δf] = Δf
+    @constraint(model, pseudo_chisq_constraint,
+               [δ_up; Δf] in SecondOrderCone())
+
+
+               function get_δ(model; recalculate_δ = false)
+                   if recalculate_δ
+                       norm(JuMP.value.(model[:Δf]))
+                   else
+                     JuMP.value(model[:δ_up])
+                   end
+               end
+
+    @objective(model, Max, L2 -L1)
+    optimize!(model)
+    δ = get_δ(model; recalculate_δ = true)
+    @constraint(model, bound_delta, δ_up == δ)
+    model
+end
+
+
+
+
+
+
+abstract type DeltaTuner end
+
+struct FixedDelta <: DeltaTuner
+    δ::Float64
+end
+
+#abstract type
+
+
+abstract type BiasVarAggregate end
+
+function (bv::BiasVarAggregate)(model)
+    bv()
+end
+
+struct RMSE <: BiasVarAggregate end
+(::RMSE)(bias, se) = sqrt(bias^2 + se^2)
+const rmse = RMSE()
+
+struct HalfCIWidth <: BiasVarAggregate
+    α::Float64
+end
+HalfCIWidth() = HalfCIWidth(0.9)
+function (half_ci::HalfCIWidth)(bias, se)
+    bias_adjusted_gaussian_ci(se, maxbias=bias, α=half_ci.α)
+end
+
+function subfamily_mse(model, n)
+    ω_δ = objective_value(model)
+    ω_δ_prime = -JuMP.dual(model[:bound_delta])
+    δ = JuMP.normalized_rhs(bound_delta)
+    max_bias = (ω_δ - δ*ω_δ_prime)/2
+    unit_var_proxy = ω_δ_prime^2
+
+    -ω_δ^2/(4 + n*δ^2)
+end
+
+
+
+struct ObjectiveDelta <: DeltaTuner
+    mse
+end
+
+
+
+function modulus_problem(Z::DiscretizedStandardNormalSample,
+                        prior_class::GaussianMixturePriorClass,
+                        target::EBayesTarget,
+                        δ::Float64;
+                        n=10_000)
+
+
 
     @objective(model, Max, L2 - L1)
 
@@ -238,6 +321,9 @@ end
 
 
 
+
+
+
 ##marginal_pdf(gm_class, params) ->  #
 
 
@@ -245,6 +331,7 @@ end
 #end
 
 # parametrize by slopes? easier constraints but harder to ....
+
 
 
 

@@ -135,3 +135,14 @@ end
     xlab --> "x"
     x,y
 end
+
+
+
+#TODO IDEA
+
+# AbstractSummarizedEBayesSamoles
+
+# dispatch on the below....
+# HistogramSamples {BaseSamples + MCEBHistogram + optional idx mapping everyone to their bin}
+# through kwarg, retain idx
+# NeighborhoodHistogramSamples {BaseSamples + MCEBHistogram}
