@@ -49,15 +49,6 @@ function (target::MarginalDensityTarget{<:StandardNormalSample})(prior::Normal)
     pdf(marginalize(prior, StandardNormalSample(0.0)), x)
 end
 
-function cf(target::MarginalDensityTarget{<:StandardNormalSample}, t)
-    error_dbn = Normal(response(location(target))) #TODO...
-    cf(error_dbn, t)
-end
-
-function riesz_representer(target::MarginalDensityTarget{<:StandardNormalSample}, t)
-    error_dbn = Normal(response(location(target))) #TODO...
-    pdf(error_dbn, t)
-end
 
 
 ## Posterior of Normal DBN

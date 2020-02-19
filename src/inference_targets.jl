@@ -6,6 +6,7 @@ abstract type EBayesTarget end
 abstract type PosteriorEBayesTarget <: EBayesTarget end
 abstract type LinearEBayesTarget <: EBayesTarget end
 
+location(target::LinearEBayesTarget) = target.Z
 
 
 # general way of computing these for Mixtures.
@@ -16,17 +17,26 @@ function (target::MinimaxCalibratedEBayes.LinearEBayesTarget)(prior::MixtureMode
 end
 
 
+#--- MarginalDensityTarget
 
 struct MarginalDensityTarget{NS <: StandardNormalSample} <: LinearEBayesTarget
     Z::NS
 end
 
-location(target::LinearEBayesTarget) = target.Z
 
-# introduce -> error_distribution();
+function cf(target::MarginalDensityTarget{<:StandardNormalSample}, t)
+    error_dbn = Normal(response(location(target))) #TODO...
+    cf(error_dbn, t)
+end
+
+function riesz_representer(target::MarginalDensityTarget{<:StandardNormalSample}, t)
+    error_dbn = Normal(response(location(target))) #TODO...
+    pdf(error_dbn, t)
+end
 
 
 
+#--- PriorDensityTarget
 struct PriorDensityTarget <: LinearEBayesTarget
     x::Float64
 end
@@ -37,7 +47,7 @@ function cf(target::PriorDensityTarget, t)
     exp(im*location(target)*t)
 end
 
-function (target::PriorDensityTarget)(prior::Distribution)
+function (target::PriorDensityTarget)(prior)
     pdf(prior, location(target))
 end
 #abstract type PosteriorNumeratorTarget <: LinearInferenceTarget end
@@ -57,12 +67,32 @@ struct LFSRNumerator{NS <: StandardNormalSample} <: LinearEBayesTarget
     Z::NS
 end
 
+function cf(target::LFSRNumerator{<:StandardNormalSample}, t)
+    x =
+    exp(im*t*x- t^2/2)*(1+im*erfi((t-im*x)/sqrt(2)))/2
+end
+
+function riesz_representer(target::LFSRNumerator{<:StandardNormalSample}, t)
+    x = response(location(target))
+    pdf(Normal(), x - t)*(t>=0)
+end
+
+
 #--------- PosteriorMeanNumerator ---------------------------------
 
 struct PosteriorMeanNumerator{NS <: StandardNormalSample} <: LinearEBayesTarget
     Z::NS
 end
 
+function cf(target::PosteriorMeanNumerator{<:StandardNormalSample}, t)
+    x = response(location(target))
+    cf(Normal(x), t)*(x + im*t)
+end
+
+function riesz_representer(target::PosteriorMeanNumerator{<:StandardNormalSample}, t)
+    x = response(location(target))
+    pdf(Normal(), target.x - t)*t
+end
 
 
 #----------------------- Posterior Targets------------------------------------------

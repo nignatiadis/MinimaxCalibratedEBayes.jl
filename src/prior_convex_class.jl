@@ -154,21 +154,23 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSample,
     @constraint(model, pseudo_chisq_constraint,
                [δ_up; Δf] in SecondOrderCone())
 
-
-               function get_δ(model; recalculate_δ = false)
-                   if recalculate_δ
-                       norm(JuMP.value.(model[:Δf]))
-                   else
-                     JuMP.value(model[:δ_up])
-                   end
-               end
-
     @objective(model, Max, L2 -L1)
     optimize!(model)
     δ = get_δ(model; recalculate_δ = true)
     @constraint(model, bound_delta, δ_up == δ)
     model
 end
+
+# helper functions for working with model.
+function get_δ(model; recalculate_δ = false)
+    if recalculate_δ
+        norm(JuMP.value.(model[:Δf]))
+    else
+      JuMP.value(model[:δ_up])
+    end
+end
+
+
 
 
 
