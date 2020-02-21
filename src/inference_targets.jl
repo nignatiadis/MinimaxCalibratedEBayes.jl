@@ -2,6 +2,13 @@ abstract type EBayesTarget end
 
 # maybe have a distinction between 1D EBayes Target and 2D.
 
+# functions so that EBayesTargets can play nicely with vectorization
+broadcastable(target::EBayesTarget) = Ref(target)
+
+function (targets::AbstractVector{<:EBayesTarget})(prior)
+	[target(prior) for target in targets]
+end
+
 
 abstract type PosteriorEBayesTarget <: EBayesTarget end
 abstract type LinearEBayesTarget <: EBayesTarget end
@@ -19,7 +26,7 @@ end
 
 #--- MarginalDensityTarget
 
-struct MarginalDensityTarget{NS <: StandardNormalSample} <: LinearEBayesTarget
+struct MarginalDensityTarget{NS} <: LinearEBayesTarget
     Z::NS
 end
 
@@ -91,7 +98,7 @@ end
 
 function riesz_representer(target::PosteriorMeanNumerator{<:StandardNormalSample}, t)
     x = response(location(target))
-    pdf(Normal(), target.x - t)*t
+    pdf(Normal(), x - t)*t
 end
 
 

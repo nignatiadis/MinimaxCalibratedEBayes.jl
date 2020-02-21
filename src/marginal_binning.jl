@@ -15,10 +15,9 @@ function MCEBHistogram(grid, hist;
     MCEBHistogram(grid, hist, infty_bound, max_bias, η_infl)
 end
 
-function MCEBHistogram(grid::StepRangeLen)
+function MCEBHistogram(grid::StepRangeLen, Zs::AbstractArray=[])
     xs = [-Inf; collect(grid); +Inf]
-    ws = zeros(Float64, length(grid)+1)
-    hist = Histogram(xs, ws, :right, false)
+    hist = fit(Histogram, Zs, xs; closed=:right)
     MCEBHistogram(grid, hist)
 end
 
@@ -29,7 +28,11 @@ Base.last(mh::MCEBHistogram) = Base.last(mh.grid)
 Base.step(mh::MCEBHistogram) = Base.step(mh.grid)
 broadcastable(mh::MCEBHistogram) = Ref(mh)
 
-pdf(mh::MCEBHistogram) = mh.hist.weights
+getindex(mhist::MCEBHistogram, k) = getindex(mhist.hist.weights, k)
+lastindex(mhist::MCEBHistogram) = lastindex(mhist.hist.weights)
+
+
+pdf(mh::MCEBHistogram) = mh.hist.weights ./ sum(mh.hist.weights)
 midpoints(mh::MCEBHistogram) = midpoints(mh.grid)
 
 struct DiscretizedStandardNormalSample{T <: Number, MH<:MCEBHistogram} <: EBayesSample{T}
@@ -50,7 +53,46 @@ zero(s::DiscretizedStandardNormalSample{T}) where T = zero(T)
 
 pdf(s::DiscretizedStandardNormalSample) = pdf(s.mhist)
 
+# DiscretizedStandardNormalSamples -> Next generation samples
 
+struct DiscretizedStandardNormalSamples{MH<:MCEBHistogram,
+                                       IX<:Union{Nothing, Vector{Int}}}
+    mhist::MH
+    idx::IX
+end
+
+# point is ... can think of above as Int{K} in MLJ-lang
+function DiscretizedStandardNormalSamples(Zs::AbstractVector{<:StandardNormalSample}, grid; keep_idx=true)
+    Zs = response.(Zs) # rethink.
+    mhist = MCEBHistogram(grid, Zs)
+    if keep_idx
+        idx = StatsBase.binindex.(mhist, Zs)
+    else
+        idx = nothing
+    end
+    DiscretizedStandardNormalSamples(mhist, idx)
+end
+
+response(Z_discr::DiscretizedStandardNormalSamples) = Z_discr.mhist.hist # what I want to say.
+
+length(Z_discr::DiscretizedStandardNormalSamples) = sum(Z_discr.mhist.hist.weights)
+
+struct DiscretizedStandardNormalSample2{DISC<:DiscretizedStandardNormalSamples}
+    samples::DISC
+    bin::Int
+end
+
+
+
+# (i) indexing -> give
+function (Zs_disc::DiscretizedStandardNormalSamples)(i::Int)
+    DiscretizedStandardNormalSample2(Zs_disc, i)
+end
+
+
+
+
+# AffineEstimator
 struct DiscretizedAffineEstimator{MH<:MCEBHistogram}
     mhist::MH
     Q::Vector{Float64}

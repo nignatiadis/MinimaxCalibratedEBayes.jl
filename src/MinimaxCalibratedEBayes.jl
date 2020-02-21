@@ -6,15 +6,21 @@ using Reexport
                 Distributions,
                 EBayes
 
-using RecipesBase
-using Plots
-using QuadGK
+using DiffResults
+using Expectations
+using ExponentialFamilies
+using ForwardDiff
 using JuMP
 using KernelDensity
 using LinearAlgebra
+using Optim
+using QuadGK
+using RecipesBase
 using Roots
+using Plots
 
-import StatsBase:Histogram,
+import StatsBase:fit,
+                 Histogram,
                  binindex,
                  midpoints,
                  response
@@ -23,13 +29,17 @@ import Statistics:var
 
 import Distributions:cf,
                      pdf,
-                     location
+                     location,
+					 loglikelihood
 
 import Base:step,
             first,
             last,
             length,
-            zero
+            zero,
+			getindex,
+			lastindex
+
 
 import Base.Broadcast: broadcastable
 
@@ -38,6 +48,7 @@ include("marginal_binning.jl")
 include("marginal_kde.jl")
 include("inference_targets.jl")
 include("normal_rules.jl")
+include("logspline_g_new.jl")
 include("butucea_comte.jl")
 include("prior_convex_class.jl")
 include("load_datasets.jl")
@@ -45,6 +56,7 @@ include("load_datasets.jl")
 
 export MCEBHistogram,
        DiscretizedStandardNormalSample,
+	   DiscretizedStandardNormalSamples,
        DiscretizedAffineEstimator,
        marginalize,
        SincKernel,
