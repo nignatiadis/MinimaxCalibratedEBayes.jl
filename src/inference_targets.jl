@@ -15,6 +15,11 @@ abstract type LinearEBayesTarget <: EBayesTarget end
 
 location(target::LinearEBayesTarget) = target.Z
 
+response(target::EBayesTarget) = _response(location(target))
+
+function _response(Z)
+	isa(Z, EBayesSample) ? response(Z) : Z
+end
 
 # general way of computing these for Mixtures.
 function (target::MinimaxCalibratedEBayes.LinearEBayesTarget)(prior::MixtureModel)
@@ -41,7 +46,9 @@ function riesz_representer(target::MarginalDensityTarget{<:StandardNormalSample}
     pdf(error_dbn, t)
 end
 
-
+function extrema(target::MarginalDensityTarget{<:StandardNormalSample})
+	(0, 1/sqrt(2π))
+end
 
 #--- PriorDensityTarget
 struct PriorDensityTarget <: LinearEBayesTarget
@@ -56,6 +63,10 @@ end
 
 function (target::PriorDensityTarget)(prior)
     pdf(prior, location(target))
+end
+
+function extrema(target::PriorDensityTarget)
+	(0, Inf)
 end
 #abstract type PosteriorNumeratorTarget <: LinearInferenceTarget end
 
@@ -111,8 +122,15 @@ end
 PosteriorMean(Z) = PosteriorTarget(PosteriorMeanNumerator(Z))
 LFSR(Z) = PosteriorTarget(LFSRNumerator(Z))
 
+location(target::PosteriorTarget) = location(target.num_target)
+
+
 function (post_target::PosteriorTarget)(prior)
     num = post_target.num_target(prior)
     denom = MarginalDensityTarget(location(post_target.num_target))(prior)
     num/denom
+end
+
+function extrema(target::PosteriorTarget{LF} where LF<:LFSRNumerator)
+	(0.0,1.0)
 end

@@ -19,7 +19,8 @@ using RecipesBase
 using Roots
 using Plots
 
-import StatsBase:fit,
+import StatsBase:confint,
+				 fit,
                  Histogram,
                  binindex,
                  midpoints,
@@ -32,7 +33,8 @@ import Distributions:cf,
                      location,
 					 loglikelihood
 
-import Base:step,
+import Base:extrema,
+			step,
             first,
             last,
             length,
@@ -75,7 +77,8 @@ export MCEBHistogram,
        worst_case_bias,
        SteinMinimaxEstimator,
        steinminimaxplot,
-       bias_adjusted_gaussian_ci
+       bias_adjusted_gaussian_ci,
+	   confint
 
 
 end # module

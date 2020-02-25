@@ -89,11 +89,29 @@ end
 
 ### Fitting Routine through (penalized MLE)
 
+Base.@kwdef mutable struct FittedContinuousExponentialFamilyModel{CEFM<:ContinuousExponentialFamilyModel,
+	                                          CEF<:ContinuousExponentialFamily,
+											  T<:Real,
+											  VT<:AbstractVector{T}}
+	cefm::CEFM
+	α_opt::VT
+	α_bias = zero(α_opt)
+	cef::CEF = cefm(α_opt .- α_bias)
+	α_covmat = nothing
+	nll_hessian = nothing
+	nll_gradient = nothing
+	regularizer_hessian = nothing
+	regularizer_gradient = nothing
+	fitter = nothing
+end
+
+Base.broadcastable(fcef::FittedContinuousExponentialFamilyModel) = Ref(fcef)
+
 
 function fit(cefm::ContinuousExponentialFamilyModel,
 	         Zs::Union{EBayesSamples, DiscretizedStandardNormalSamples};
 			 integrator = expectation(cefm.base_measure; n=50),
-			 c0 = 0.001,
+			 c0 = 1e-6,
 			 optim_options = Optim.Options(show_trace=true, show_every=1, g_tol=1e-4)) # to stabilize optimization
 
 			 n = length(Zs)
@@ -119,8 +137,48 @@ function fit(cefm::ContinuousExponentialFamilyModel,
 			hessian_storage_nll = DiffResults.HessianResult(α_opt)
 			hessian_storage_nll = ForwardDiff.hessian!(hessian_storage_nll, _nll, α_opt);
 
+			nll_hessian = DiffResults.hessian(hessian_storage_nll)
+			nll_gradient = DiffResults.gradient(hessian_storage_nll)
+
 			hessian_storage_s = DiffResults.HessianResult(α_opt)
 			hessian_storage_s = ForwardDiff.hessian!(hessian_storage_s, _s, α_opt);
 
-			(cef=cef, α=α_opt, nll=hessian_storage_nll, s=hessian_storage_s)
+			regularizer_hessian = DiffResults.hessian(hessian_storage_s)
+			regularizer_gradient = DiffResults.gradient(hessian_storage_s)
+
+			inv_mat = inv( (nll_hessian + regularizer_hessian).*sqrt(n))
+			α_covmat = inv_mat*nll_hessian*inv_mat
+
+			α_bias = -inv_mat*regularizer_gradient .* sqrt(n)
+
+			FittedContinuousExponentialFamilyModel(;cefm=cefm,
+			                                       α_opt=α_opt,
+												   α_covmat=α_covmat,
+												   α_bias = α_bias,
+												   nll_hessian=nll_hessian,
+												   nll_gradient=nll_gradient,
+												   regularizer_hessian=regularizer_hessian,
+												   regularizer_gradient=regularizer_gradient,
+												   fitter=optim_res)
+end
+
+
+function _target_bias_std(target::EBayesTarget, fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel; bias_corrected=true)
+	_fun(α) = target(fcef.cefm(α))
+	α_opt = fcef.α_opt
+	target_gradient = ForwardDiff.gradient(_fun, α_opt);
+	target_bias = LinearAlgebra.dot(target_gradient, fcef.α_bias)
+	target_variance = LinearAlgebra.dot(target_gradient, fcef.α_covmat*target_gradient)
+	target_value = bias_corrected ? _fun(α_opt) - target_bias : _fun(α_opt)
+	(target = target_value,
+	 bias = target_bias,
+	 std = sqrt(target_variance))
+end
+
+function StatsBase.confint(target::EBayesTarget,
+	                       fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;
+						   level::Real = 0.9, kwargs...)
+	res = _target_bias_std(target, fcef; kwargs...)
+	q = quantile(Normal(), (1+level)/2)
+    res[:target] .+ (-1,1).*q.*res[:std]
 end
