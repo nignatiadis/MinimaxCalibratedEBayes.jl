@@ -12,6 +12,7 @@ using ExponentialFamilies
 using ForwardDiff
 using JuMP
 using KernelDensity
+using LaTeXStrings
 using LinearAlgebra
 using Optim
 using QuadGK
@@ -29,6 +30,7 @@ import StatsBase:confint,
 import Statistics:var
 
 import Distributions:cf,
+                     estimate,
                      pdf,
                      location,
 					 loglikelihood
@@ -52,12 +54,12 @@ include("inference_targets.jl")
 include("normal_rules.jl")
 include("logspline_g_new.jl")
 include("butucea_comte.jl")
-include("prior_convex_class.jl")
+#include("prior_convex_class.jl")
 include("load_datasets.jl")
+include("helper_plots.jl")
 
 
 export MCEBHistogram,
-       DiscretizedStandardNormalSample,
 	   DiscretizedStandardNormalSamples,
        DiscretizedAffineEstimator,
        marginalize,
@@ -78,7 +80,9 @@ export MCEBHistogram,
        SteinMinimaxEstimator,
        steinminimaxplot,
        bias_adjusted_gaussian_ci,
-	   confint
+	   confint,
+	   confintplot,
+	   confintplot!
 
 
 end # module

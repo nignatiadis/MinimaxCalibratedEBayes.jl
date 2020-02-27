@@ -35,49 +35,42 @@ lastindex(mhist::MCEBHistogram) = lastindex(mhist.hist.weights)
 pdf(mh::MCEBHistogram) = mh.hist.weights ./ sum(mh.hist.weights)
 midpoints(mh::MCEBHistogram) = midpoints(mh.grid)
 
-struct DiscretizedStandardNormalSample{T <: Number, MH<:MCEBHistogram} <: EBayesSample{T}
-    Z::T
-    mhist::MH
-end
 
-DiscretizedStandardNormalSample(mhist) = DiscretizedStandardNormalSample(NaN, mhist)
-function DiscretizedStandardNormalSample(a::Number, grid::StepRangeLen)
-    DiscretizedStandardNormalSample(a, MCEBHistogram(grid))
-end
-
-response(s::DiscretizedStandardNormalSample) = s.Z
-var(s::DiscretizedStandardNormalSample) = 1
-
-eltype(s::DiscretizedStandardNormalSample{T}) where T = T
-zero(s::DiscretizedStandardNormalSample{T}) where T = zero(T)
-
-pdf(s::DiscretizedStandardNormalSample) = pdf(s.mhist)
-
-# DiscretizedStandardNormalSamples -> Next generation samples
+# DiscretizedStandardNormalSamples
 
 struct DiscretizedStandardNormalSamples{MH<:MCEBHistogram,
                                        IX<:Union{Nothing, Vector{Int}}}
     mhist::MH
     idx::IX
+    nbhood
 end
 
+function DiscretizedStandardNormalSamples(Zs::AbstractVector{<:StandardNormalSample},
+                                          grid::AbstractVector;
+                                          kwargs...)
+    mhist = MCEBHistogram(grid, response.(Zs))
+    DiscretizedStandardNormalSamples(Zs, mhist; kwargs...)
+end
+
+
 # point is ... can think of above as Int{K} in MLJ-lang
-function DiscretizedStandardNormalSamples(Zs::AbstractVector{<:StandardNormalSample}, grid; keep_idx=true)
+function DiscretizedStandardNormalSamples(Zs::AbstractVector{<:StandardNormalSample},
+                                          mhist::MCEBHistogram;
+                                          keep_idx=true)
     Zs = response.(Zs) # rethink.
-    mhist = MCEBHistogram(grid, Zs)
     if keep_idx
         idx = StatsBase.binindex.(mhist, Zs)
     else
         idx = nothing
     end
-    DiscretizedStandardNormalSamples(mhist, idx)
+    DiscretizedStandardNormalSamples(mhist, idx, nothing)
 end
 
 response(Z_discr::DiscretizedStandardNormalSamples) = Z_discr.mhist.hist # what I want to say.
 
 length(Z_discr::DiscretizedStandardNormalSamples) = sum(Z_discr.mhist.hist.weights)
 
-struct DiscretizedStandardNormalSample2{DISC<:DiscretizedStandardNormalSamples}
+struct DiscretizedStandardNormalSample{DISC<:DiscretizedStandardNormalSamples}
     samples::DISC
     bin::Int
 end
@@ -86,7 +79,7 @@ end
 
 # (i) indexing -> give
 function (Zs_disc::DiscretizedStandardNormalSamples)(i::Int)
-    DiscretizedStandardNormalSample2(Zs_disc, i)
+    DiscretizedStandardNormalSample(Zs_disc, i)
 end
 
 
@@ -100,7 +93,7 @@ struct DiscretizedAffineEstimator{MH<:MCEBHistogram}
 end
 
 
-DiscretizedAffineEstimator(Z::DiscretizedStandardNormalSample, args...) = DiscretizedAffineEstimator(Z.mhist, args...)
+DiscretizedAffineEstimator(Z::DiscretizedStandardNormalSamples, args...) = DiscretizedAffineEstimator(Z.mhist, args...)
 
 DiscretizedAffineEstimator(mhist, Q) = DiscretizedAffineEstimator(mhist, Q, Base.zero(Float64))
 

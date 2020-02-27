@@ -23,8 +23,8 @@ end
 const NormalOrNormalMixture = Union{Normal,
     MixtureModel{Univariate, Continuous, Normal}}
 
-function marginalize(prior::NormalOrNormalMixture, Z::DiscretizedStandardNormalSample)
-    marginal_normal = marginalize(prior, StandardNormalSample(response(Z)))
+function marginalize(prior::NormalOrNormalMixture, Z::DiscretizedStandardNormalSamples)
+    marginal_normal = marginalize(prior, StandardNormalSample(NaN))
 
     grid = Z.mhist.grid
     hist = deepcopy(Z.mhist.hist)

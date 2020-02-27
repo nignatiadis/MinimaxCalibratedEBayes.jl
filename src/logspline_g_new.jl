@@ -38,7 +38,7 @@ function (target::LFSRNumerator{<:StandardNormalSample})(prior::ContinuousExpone
 end
 
 #----------------- Under discretization
-function (target::MarginalDensityTarget{<:DiscretizedStandardNormalSample2})(prior::ContinuousExponentialFamily;
+function (target::MarginalDensityTarget{<:DiscretizedStandardNormalSample})(prior::ContinuousExponentialFamily;
                                                                             integrator=expectation(prior.base_measure; n=500))
     Z_disc = location(target)
     grid = Z_disc.samples.mhist.grid
@@ -96,7 +96,7 @@ Base.@kwdef mutable struct FittedContinuousExponentialFamilyModel{CEFM<:Continuo
 	cefm::CEFM
 	α_opt::VT
 	α_bias = zero(α_opt)
-	cef::CEF = cefm(α_opt .- α_bias)
+	cef::CEF = cefm(α_opt)
 	α_covmat = nothing
 	nll_hessian = nothing
 	nll_gradient = nothing
@@ -112,7 +112,8 @@ function fit(cefm::ContinuousExponentialFamilyModel,
 	         Zs::Union{EBayesSamples, DiscretizedStandardNormalSamples};
 			 integrator = expectation(cefm.base_measure; n=50),
 			 c0 = 1e-6,
-			 optim_options = Optim.Options(show_trace=true, show_every=1, g_tol=1e-4)) # to stabilize optimization
+			 solver = Newton(),
+			 optim_options = Optim.Options(show_trace=true, show_every=1, g_tol=1e-6)) # to stabilize optimization
 
 			 n = length(Zs)
 			 # initialize method through Lindsey's method
@@ -123,12 +124,12 @@ function fit(cefm::ContinuousExponentialFamilyModel,
 				 exp_family = cefm(α; integrator=integrator)
 				 -loglikelihood(exp_family, Zs; integrator=integrator, normalize=true)
 			 end
-			 _s(α) = c0*norm(α)/n #allow other choices
+			 _s(α) = c0*sum(abs2, α)/n# c0*norm(α)/n #allow other choices
  			 _penalized_nll(α) = _nll(α) + _s(α)
 
 			 # ready to descend
 			 optim_res = optimize(_penalized_nll, fit_lindsey.α,
-			                          Newton(), optim_options;
+			                          solver, optim_options;
 			 						 autodiff = :forward)
 
 			α_opt = Optim.minimizer(optim_res)
@@ -139,6 +140,13 @@ function fit(cefm::ContinuousExponentialFamilyModel,
 
 			nll_hessian = DiffResults.hessian(hessian_storage_nll)
 			nll_gradient = DiffResults.gradient(hessian_storage_nll)
+
+
+			# project onto psd cone
+			nll_hessian_eigen = eigen(Symmetric(nll_hessian))
+			nll_hessian_eigen.values .= max.(nll_hessian_eigen.values, 0.0)
+			nll_hessian = Matrix(nll_hessian_eigen)
+
 
 			hessian_storage_s = DiffResults.HessianResult(α_opt)
 			hessian_storage_s = ForwardDiff.hessian!(hessian_storage_s, _s, α_opt);
@@ -163,22 +171,52 @@ function fit(cefm::ContinuousExponentialFamilyModel,
 end
 
 
-function _target_bias_std(target::EBayesTarget, fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel; bias_corrected=true)
+function target_bias_std(target::EBayesTarget,
+	                     fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;
+	                     bias_corrected=true,
+						 clip=true)
 	_fun(α) = target(fcef.cefm(α))
 	α_opt = fcef.α_opt
 	target_gradient = ForwardDiff.gradient(_fun, α_opt);
 	target_bias = LinearAlgebra.dot(target_gradient, fcef.α_bias)
 	target_variance = LinearAlgebra.dot(target_gradient, fcef.α_covmat*target_gradient)
 	target_value = bias_corrected ? _fun(α_opt) - target_bias : _fun(α_opt)
-	(target = target_value,
-	 bias = target_bias,
-	 std = sqrt(target_variance))
+
+	if clip
+		target_value = clamp(target_value, extrema(target)...)
+	end
+
+	(estimated_target = target_value,
+	 estimated_bias = target_bias,
+	 estimated_std = sqrt(target_variance))
+end
+
+function Distributions.estimate(target::EBayesTarget, fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel; kwargs...)
+	target_bias_std(target, fcef; kwargs...)[:estimated_target]
 end
 
 function StatsBase.confint(target::EBayesTarget,
 	                       fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;
-						   level::Real = 0.9, kwargs...)
-	res = _target_bias_std(target, fcef; kwargs...)
-	q = quantile(Normal(), (1+level)/2)
-    res[:target] .+ (-1,1).*q.*res[:std]
+						   level::Real = 0.9,
+						   worst_case_bias_adjusted = true,
+						   clip = true)
+    if worst_case_bias_adjusted
+		res = target_bias_std(target, fcef;
+		                      clip = false, #we will clip the CIs themselves instead
+							  bias_corrected = false) # we will account for worst case bias instead
+		maxbias = abs(res[:estimated_bias])
+	else
+		res =  target_bias_std(target, fcef; clip=false, bias_corrected = true)
+		maxbias = 0.0
+	end
+
+	q_mult = bias_adjusted_gaussian_ci(res[:estimated_std], maxbias=maxbias , level=level)
+
+    L,U = res[:estimated_target] .+ (-1,1).*q_mult
+
+	if clip
+		L, U = clamp.((L,U), extrema(target)... )
+	end
+
+	L,U
 end

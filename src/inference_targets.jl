@@ -5,6 +5,14 @@ abstract type EBayesTarget end
 # functions so that EBayesTargets can play nicely with vectorization
 broadcastable(target::EBayesTarget) = Ref(target)
 
+function extrema(target::EBayesTarget) #fallback
+	(-Inf, Inf)
+end
+
+function pretty_label(target::EBayesTarget)
+	""
+end
+
 function (targets::AbstractVector{<:EBayesTarget})(prior)
 	[target(prior) for target in targets]
 end
@@ -35,6 +43,8 @@ struct MarginalDensityTarget{NS} <: LinearEBayesTarget
     Z::NS
 end
 
+pretty_label(target::MarginalDensityTarget) = L"f(x)"
+
 
 function cf(target::MarginalDensityTarget{<:StandardNormalSample}, t)
     error_dbn = Normal(response(location(target))) #TODO...
@@ -55,6 +65,8 @@ struct PriorDensityTarget <: LinearEBayesTarget
     x::Float64
 end
 
+pretty_label(target::PriorDensityTarget) = L"g(x)"
+
 location(target::PriorDensityTarget) = target.x
 
 function cf(target::PriorDensityTarget, t)
@@ -64,6 +76,12 @@ end
 function (target::PriorDensityTarget)(prior)
     pdf(prior, location(target))
 end
+
+# hard coding this since almost everything else mixture related is handled as above.
+function (target::PriorDensityTarget)(prior::MixtureModel)
+	pdf(prior, location(target))
+end
+
 
 function extrema(target::PriorDensityTarget)
 	(0, Inf)
@@ -133,4 +151,12 @@ end
 
 function extrema(target::PosteriorTarget{LF} where LF<:LFSRNumerator)
 	(0.0,1.0)
+end
+
+function pretty_label(target::PosteriorTarget{LF} where LF<:LFSRNumerator)
+	L"\theta(x) = \Pr[\mu \geq 0 \mid X=x]"
+end
+
+function pretty_label(target::PosteriorTarget{PM} where PM<:PosteriorMeanNumerator)
+	L"\theta(x) = E[\mu | X=x]"
 end
