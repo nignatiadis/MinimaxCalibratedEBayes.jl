@@ -28,6 +28,7 @@ function marginalize(prior::NormalOrNormalMixture, Z::DiscretizedStandardNormalS
 
     grid = Z.mhist.grid
     hist = deepcopy(Z.mhist.hist)
+    hist = @set hist.weights = zeros(Float64, length(hist.weights))
 
     hist.weights[1] = cdf(marginal_normal,  first(grid))
     hist.weights[end] = ccdf(marginal_normal, last(grid))
@@ -37,7 +38,7 @@ function marginalize(prior::NormalOrNormalMixture, Z::DiscretizedStandardNormalS
         #TODO: add sanity check that this is approx. h*density
     end
 
-    MCEBHistogram(grid, hist, infty_bound = 0.0)
+    MCEBHistogram(grid, hist)
 end
 
 

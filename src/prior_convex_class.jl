@@ -30,7 +30,7 @@ function add_prior_variables!(model, gmix_class::GaussianMixturePriorClass; var_
 end
 
 function marginalize(gmix_class::GaussianMixturePriorClass,
-                     z::DiscretizedStandardNormalSample,
+                     z::DiscretizedStandardNormalSamples,
                      param_vec) #-> A*param_vec
     σ_prior = gmix_class.σ_prior
     grid = gmix_class.grid
@@ -65,7 +65,7 @@ end
 
 
 function worst_case_bias(Q::DiscretizedAffineEstimator,
-                  Z::DiscretizedStandardNormalSample,
+                  Z::DiscretizedStandardNormalSamples,
                   gmix_class::GaussianMixturePriorClass,
                   target::EBayesTarget;
                   maximization=true)
@@ -74,7 +74,7 @@ function worst_case_bias(Q::DiscretizedAffineEstimator,
     πs = add_prior_variables!(model, gmix_class; var_name = "πs")
     fs = marginalize(gmix_class, Z, πs)
     L = linear_functional(gmix_class, target, πs)
-    #if (C < Inf)
+
     #    @constraint(jm, f3 .- f_marginal .<= C*h_marginal_grid)
     #    @constraint(jm, f3 .- f_marginal .>= -C*h_marginal_grid)
     #end
@@ -101,7 +101,7 @@ end
 
 #end
 Base.@kwdef mutable struct SteinMinimaxEstimator
-                Z::DiscretizedStandardNormalSample
+                Z::DiscretizedStandardNormalSamples
                 prior_class::ConvexPriorClass
                 target::EBayesTarget
                 δ::Float64
@@ -116,11 +116,20 @@ Base.@kwdef mutable struct SteinMinimaxEstimator
                 model
 end
 
-function initialize_modulus_problem(Z::DiscretizedStandardNormalSample,
+# helper functions for working with model.
+function get_δ(model; recalculate_δ = false)
+    if recalculate_δ
+        norm(JuMP.value.(model[:Δf]))
+    else
+      JuMP.value(model[:δ_up])
+    end
+end
+
+function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
                                     prior_class::GaussianMixturePriorClass,
                                     target::EBayesTarget)
 
-    model = Model(with_optimizer(prior_class.solver; prior_class.solver_params...))
+    model = Model(prior_class.solver; prior_class.solver_params...)
     πs1 = add_prior_variables!(model, prior_class; var_name = "πs1")
     πs2 = add_prior_variables!(model, prior_class; var_name = "πs2")
 
@@ -130,11 +139,18 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSample,
     model[:fs1] = fs1
     model[:fs2] = fs2
 
+    if (!isnothing(Z.f_max))
+        idx_upper = findall( Z.f_max .< 1/sqrt(2π))
+        @constraint(model, f1_upper, fs1[idx_upper] .<= Z.f_max[idx_upper])
+        @constraint(model, f2_upper, fs2[idx_upper] .<= Z.f_max[idx_upper])
+    end
 
-    #if (C < Inf)
-    #    @constraint(jm, f3 .- f_marginal .<= C*h_marginal_grid)
-    #    @constraint(jm, f3 .- f_marginal .>= -C*h_marginal_grid)
-    #end
+    if (!isnothing(Z.f_min))
+        idx_nonzero = findall( Z.f_min .> 0.0)
+        @constraint(model, f1_lower, fs1[idx_nonzero] .>= Z.f_min[idx_nonzero])
+        @constraint(model, f2_lower, fs2[idx_nonzero] .>= Z.f_min[idx_nonzero])
+    end
+
 
     L1 = linear_functional(prior_class, target, πs1)
     L2 = linear_functional(prior_class, target, πs2)
@@ -142,8 +158,8 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSample,
     model[:L1] = L1
     model[:L2] = L2
 
-    f̄s_sqrt = sqrt.(pdf(Z))
-    model[:f̄s_sqrt] = sqrt.(pdf(Z))
+    f̄s_sqrt = sqrt.(Z.var_proxy)
+    model[:f̄s_sqrt] = f̄s_sqrt
                     #pseudo_chisq_dist = sum( (fs1 .- fs2).^2)
                                         #@constraint(model, pseudo_chisq_dist <= δ)
     @variable(model, δ_up)
@@ -157,20 +173,34 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSample,
     @objective(model, Max, L2 -L1)
     optimize!(model)
     δ = get_δ(model; recalculate_δ = true)
+    model[:δ_max] = δ
     @constraint(model, bound_delta, δ_up == δ)
     model
 end
 
-# helper functions for working with model.
-function get_δ(model; recalculate_δ = false)
-    if recalculate_δ
-        norm(JuMP.value.(model[:Δf]))
-    else
-      JuMP.value(model[:δ_up])
-    end
+function modulus_at_δ(model, δ)
+    set_normalized_rhs(model[:bound_delta], δ)
+    optimize!(model)
+    model
 end
 
 
+
+function δ_path(model, δs)
+    max_biases = Vector{Float64}(undef, length(δs))
+    unit_variances   = Vector{Float64}(undef, length(δs))
+    for (i,δ) in enumerate(δs)
+        model = modulus_at_δ(model, δ)
+        tmp_bias, tmp_var = get_bias_var(model)
+        max_biases[i] = tmp_bias
+        unit_variances[i] = tmp_var
+    end
+    max_biases, unit_variances
+end
+
+
+
+#function solve_modulus_problem
 
 
 
@@ -183,25 +213,48 @@ struct FixedDelta <: DeltaTuner
     δ::Float64
 end
 
-#abstract type
+struct OptimalDelta <: DeltaTuner
+    mse
+end
 
 
 abstract type BiasVarAggregate end
 
-function (bv::BiasVarAggregate)(model)
-    bv()
+function get_bias_var(model::JuMP.Model)
+    δ = get_δ(model)
+    ω_δ = objective_value(model)
+    ω_δ_prime = -JuMP.dual(model[:bound_delta])
+    max_bias = (ω_δ - δ*ω_δ_prime)/2
+    unit_var_proxy = ω_δ_prime^2
+    max_bias, unit_var_proxy
 end
 
-struct RMSE <: BiasVarAggregate end
-(::RMSE)(bias, se) = sqrt(bias^2 + se^2)
-const rmse = RMSE()
+function (bv::BiasVarAggregate)(model::JuMP.Model)
+    bv(get_bias_var(model)...)
+end
+
+struct RMSE <: BiasVarAggregate
+    n::Integer
+    δ_min::Float64
+end
+
+(rmse::RMSE)(bias, unit_var_proxy) = sqrt(bias^2 + unit_var_proxy/rmse.n)
 
 struct HalfCIWidth <: BiasVarAggregate
+    n::Integer
     α::Float64
+    δ_min::Float64
 end
-HalfCIWidth() = HalfCIWidth(0.9)
-function (half_ci::HalfCIWidth)(bias, se)
-    bias_adjusted_gaussian_ci(se, maxbias=bias, α=half_ci.α)
+
+#default_δ_min(n) =
+#default_δ_min(n) =
+
+#end
+#HalfCIWidth(n) = HalfCIWidth(n, 0.9, )
+
+function (half_ci::HalfCIWidth)(bias, unit_var_proxy)
+    se = sqrt(unit_var_proxy/half_ci.n)
+    bias_adjusted_gaussian_ci(se, maxbias=bias, level=half_ci.α)
 end
 
 function subfamily_mse(model, n)
@@ -216,43 +269,56 @@ end
 
 
 
-struct ObjectiveDelta <: DeltaTuner
-    mse
+
+
+
+var(sme::SteinMinimaxEstimator) = sme.unit_var_proxy/sme.n
+
+
+function worst_case_bias(sme::SteinMinimaxEstimator)
+    sme.max_bias
 end
 
 
-
-function modulus_problem(Z::DiscretizedStandardNormalSample,
-                        prior_class::GaussianMixturePriorClass,
-                        target::EBayesTarget,
-                        δ::Float64;
-                        n=10_000)
+function SteinMinimaxEstimator(Z::DiscretizedStandardNormalSamples,
+                                    prior_class::GaussianMixturePriorClass,
+                                    target::EBayesTarget,
+                                    model::JuMP.Model)
 
 
-
-    @objective(model, Max, L2 - L1)
-
-    optimize!(model)
+    δ = MinimaxCalibratedEBayes.get_δ(model)
     ω_δ = objective_value(model)
     ω_δ_prime = -JuMP.dual(model[:bound_delta])
 
-    g1 = prior_class(JuMP.value.(πs1))
-    g2 = prior_class(JuMP.value.(πs2))
-    L1 = JuMP.value(L1)
-    L2 = JuMP.value(L2)
+    πs1 = JuMP.value.(model[:πs1])
+    πs2 = JuMP.value.(model[:πs2])
 
+    πs1 = max.(πs1, 0.0)
+    πs1 = πs1 ./ sum(πs1)
+
+    πs2 = max.(πs2, 0.0)
+    πs2 = πs2 ./ sum(πs2)
+
+    g1 = prior_class(πs1)
+    g2 = prior_class(πs2)
+
+    L1 = JuMP.value(model[:L1])
+    L2 = JuMP.value(model[:L2])
     #construct estimator
     f1 = marginalize(g1, Z)
     f2 = marginalize(g2, Z)
 
-    Q = ω_δ_prime/δ*(pdf(f2) .- pdf(f1))./pdf(Z)
+    f̄s_sqrt = model[:f̄s_sqrt]
+    Q = ω_δ_prime/δ*(pdf(f2) .- pdf(f1))./Z.var_proxy
     Q_0  = (L1+L2)/2 -
-           ω_δ_prime/(2*δ)*sum( (pdf(f2) .- pdf(f1)).* (pdf(f2) .+ pdf(f1)) ./ pdf(Z))
+           ω_δ_prime/(2*δ)*sum( (pdf(f2) .- pdf(f1)).* (pdf(f2) .+ pdf(f1)) ./ f̄s_sqrt)
 
     stein = DiscretizedAffineEstimator(Z, Q, Q_0)
+
     max_bias = (ω_δ - δ*ω_δ_prime)/2
     unit_var_proxy = ω_δ_prime^2
 
+    n = length(Z)
     SteinMinimaxEstimator(Z=Z,
                           prior_class=prior_class,
                           target=target,
@@ -268,10 +334,7 @@ function modulus_problem(Z::DiscretizedStandardNormalSample,
                           model=model)
 end
 
-var(sme::SteinMinimaxEstimator) = sme.unit_var_proxy/sme.n
-function worst_case_bias(sme::SteinMinimaxEstimator)
-    sme.max_bias
-end
+
 
 
 @userplot SteinMinimaxPlot

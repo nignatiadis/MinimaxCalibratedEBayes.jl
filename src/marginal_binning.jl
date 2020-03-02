@@ -39,10 +39,15 @@ midpoints(mh::MCEBHistogram) = midpoints(mh.grid)
 # DiscretizedStandardNormalSamples
 
 struct DiscretizedStandardNormalSamples{MH<:MCEBHistogram,
-                                       IX<:Union{Nothing, Vector{Int}}}
-    mhist::MH
+                                       IX<:Union{Nothing, Vector{Int}},
+                                       Tvar,
+                                       Tmin,
+                                       Tmax}
+    mhist::MH                                   
     idx::IX
-    nbhood
+    var_proxy::Tvar
+    f_min::Tmin
+    f_max::Tmax
 end
 
 function DiscretizedStandardNormalSamples(Zs::AbstractVector{<:StandardNormalSample},
@@ -56,14 +61,17 @@ end
 # point is ... can think of above as Int{K} in MLJ-lang
 function DiscretizedStandardNormalSamples(Zs::AbstractVector{<:StandardNormalSample},
                                           mhist::MCEBHistogram;
-                                          keep_idx=true)
+                                          keep_idx=true,
+                                          var_proxy=1/sqrt(2*pi),
+                                          f_min=nothing,
+                                          f_max=nothing)
     Zs = response.(Zs) # rethink.
     if keep_idx
         idx = StatsBase.binindex.(mhist, Zs)
     else
         idx = nothing
     end
-    DiscretizedStandardNormalSamples(mhist, idx, nothing)
+    DiscretizedStandardNormalSamples(mhist, idx, var_proxy, f_min, f_max)
 end
 
 response(Z_discr::DiscretizedStandardNormalSamples) = Z_discr.mhist.hist # what I want to say.

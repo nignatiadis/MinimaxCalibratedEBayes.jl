@@ -16,6 +16,7 @@ using LaTeXStrings
 using LinearAlgebra
 using Optim
 using QuadGK
+using Setfield
 using RecipesBase
 using Roots
 using Plots
@@ -49,12 +50,12 @@ import Base.Broadcast: broadcastable
 
 include("bias_adjusted_ci.jl")
 include("marginal_binning.jl")
-include("marginal_kde.jl")
 include("inference_targets.jl")
 include("normal_rules.jl")
+include("marginal_kde.jl")
 include("logspline_g_new.jl")
 include("butucea_comte.jl")
-#include("prior_convex_class.jl")
+include("prior_convex_class.jl")
 include("load_datasets.jl")
 include("helper_plots.jl")
 
@@ -82,7 +83,8 @@ export MCEBHistogram,
        bias_adjusted_gaussian_ci,
 	   confint,
 	   confintplot,
-	   confintplot!
+	   confintplot!,
+	   set_neighborhood
 
 
 end # module

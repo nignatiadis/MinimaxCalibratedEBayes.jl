@@ -51,12 +51,21 @@ function pdf(a::DeLaValleePoussinKernel, t)
 end
 
 
+Base.@kwdef struct KDEInfinityBand{T<:Real}
+    C∞::T
+    a_min::T
+    a_max::T
+    fitted_kde
+    interp_kde
+    kernel
+end
+
 
 function certainty_banded_KDE(Xs, a_min, a_max;
                         npoints = 4096,
                         kernel=DeLaValleePoussinKernel,
                         bandwidth = default_bandwidth(kernel, length(Xs)),
-                        nboot = 1000)
+                        nboot = 1_000)
 
     kernel = kernel(bandwidth)
     h = bandwidth
@@ -83,5 +92,72 @@ function certainty_banded_KDE(Xs, a_min, a_max;
 
     C∞ = median(C∞_boot)
 
-    (C∞=C∞, fitted_kde=fitted_kde, interp_kde=interp_kde, kernel=kernel)
+    KDEInfinityBand(C∞=C∞,
+                    a_min=a_min,
+                    a_max=a_max,
+                    fitted_kde=fitted_kde,
+                    interp_kde=interp_kde,
+                    kernel=kernel)
+end
+
+function certainty_banded_KDE(Xs, Zs_discr::DiscretizedStandardNormalSamples; kwargs...)
+    a_min, a_max = extrema(Zs_discr.mhist.grid)
+    certainty_banded_KDE(Xs, a_min, a_max; kwargs...)
+end
+
+function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
+                                fkde::MinimaxCalibratedEBayes.KDEInfinityBand;
+                                n_interp = 25,
+                                η_infl = 1.1) # todo add bias adjustment too
+    grid = Zs_discr.mhist.grid
+    fkde_interp = fkde.interp_kde.itp
+    n = length(Zs_discr)
+
+    f_max = zeros(length(grid) + 1)
+    f_min = zeros(length(grid) + 1)
+    var_proxy =  zeros(length(grid) + 1)
+
+    C∞ = η_infl * fkde.C∞
+    # fill in intermediate points first
+    for i in 2:length(grid)
+        x_left = grid[i-1]
+        x_right = grid[i]
+        h = x_right - x_left  # step(grid)...
+        interp_res = fkde_interp(range(x_left, x_right, length=n_interp))
+        f_max[i] = maximum(interp_res)*h + C∞
+        f_min[i] = max( minimum(interp_res)*h - C∞, 0.0)
+        var_proxy[i] = max(maximum(interp_res)*h, C∞)
+    end
+
+    #fill in first and last element
+
+    # DKW constant with log(n) instead of log(2/alpha)
+    C_dkw = sqrt(log(n)/2n)
+    f_max[1] = pdf(Zs_discr.mhist)[1] + C_dkw
+    f_min[1] = max(pdf(Zs_discr.mhist)[1] - C_dkw, 0.0)
+    var_proxy[1] = f_max[1]
+    f_max[end] = pdf(Zs_discr.mhist)[end] + C_dkw
+    f_min[end] = max(pdf(Zs_discr.mhist)[end] - C_dkw, 0.0)
+    var_proxy[end] = f_max[end]
+
+    Zs_discr = @set Zs_discr.var_proxy = var_proxy
+    Zs_discr = @set Zs_discr.f_min = f_min
+    Zs_discr = @set Zs_discr.f_max = f_max
+    Zs_discr
+end
+
+
+function set_neighborhood(Zs::DiscretizedStandardNormalSamples,
+                          prior::Distribution;
+                          C∞ = Inf)
+
+   f = pdf(marginalize(Normal(0,1), Zs))
+   Zs = @set Zs.var_proxy = f
+
+   if C∞ < Inf
+       Zs = @set Zs.f_max = f .+ C∞
+       Zs = @set Zs.f_min = min.( f .- C∞, 0.0)
+   end
+
+   Zs
 end
