@@ -100,21 +100,7 @@ end
 #function optimize!(modulus_problem, Z, gmix_class, target, δ)
 
 #end
-Base.@kwdef mutable struct SteinMinimaxEstimator
-                Z::DiscretizedStandardNormalSamples
-                prior_class::ConvexPriorClass
-                target::EBayesTarget
-                δ::Float64
-                ω_δ::Float64
-                ω_δ_prime::Float64
-                g1
-                g2
-                Q::DiscretizedAffineEstimator
-                max_bias::Float64
-                unit_var_proxy::Float64
-                n::Int
-                model
-end
+
 
 # helper functions for working with model.
 function get_δ(model; recalculate_δ = false)
@@ -129,7 +115,7 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
                                     prior_class::GaussianMixturePriorClass,
                                     target::EBayesTarget)
 
-    model = Model(prior_class.solver; prior_class.solver_params...)
+    model = Model(with_optimizer(prior_class.solver; prior_class.solver_params...))
     πs1 = add_prior_variables!(model, prior_class; var_name = "πs1")
     πs2 = add_prior_variables!(model, prior_class; var_name = "πs2")
 
@@ -200,9 +186,11 @@ end
 
 
 
+
+default_δ_min(n, C∞_density) = sqrt( log(n)/n)*C∞_density
+
+
 #function solve_modulus_problem
-
-
 
 
 
@@ -213,12 +201,11 @@ struct FixedDelta <: DeltaTuner
     δ::Float64
 end
 
-struct OptimalDelta <: DeltaTuner
-    mse
+function optimal_δ(model::JuMP.Model, objective::FixedDelta)
+    objective.δ
 end
 
-
-abstract type BiasVarAggregate end
+abstract type BiasVarAggregate <:DeltaTuner end
 
 function get_bias_var(model::JuMP.Model)
     δ = get_δ(model)
@@ -257,6 +244,16 @@ function (half_ci::HalfCIWidth)(bias, unit_var_proxy)
     bias_adjusted_gaussian_ci(se, maxbias=bias, level=half_ci.α)
 end
 
+
+function optimal_δ(model::JuMP.Model, objective::BiasVarAggregate)
+    f = δ -> objective(modulus_at_δ(model, δ))
+    δ_max = model[:δ_max]
+    δ_min = objective.δ_min
+    Optim.optimize(f, δ_min, δ_max).minimizer
+end
+
+
+
 function subfamily_mse(model, n)
     ω_δ = objective_value(model)
     ω_δ_prime = -JuMP.dual(model[:bound_delta])
@@ -271,6 +268,23 @@ end
 
 
 
+Base.@kwdef mutable struct SteinMinimaxEstimator
+                Z::DiscretizedStandardNormalSamples
+                prior_class::ConvexPriorClass
+                target::EBayesTarget
+                δ::Float64
+                ω_δ::Float64
+                ω_δ_prime::Float64
+                g1
+                g2
+                Q::DiscretizedAffineEstimator
+                max_bias::Float64
+                unit_var_proxy::Float64
+                n::Int
+                δ_tuner::DeltaTuner
+                δ_opt::Float64
+                model
+end
 
 var(sme::SteinMinimaxEstimator) = sme.unit_var_proxy/sme.n
 
@@ -280,13 +294,28 @@ function worst_case_bias(sme::SteinMinimaxEstimator)
 end
 
 
+function SteinMinimaxEstimator(Zs_discr::DiscretizedStandardNormalSamples,
+                               gmix::ConvexPriorClass,
+                               target::LinearEBayesTarget,
+                               δ_tuner::DeltaTuner)
+
+   modulus_problem = initialize_modulus_problem(Zs_discr, gmix, target)
+   δ_opt = optimal_δ(modulus_problem, δ_tuner)
+   modulus_problem = modulus_at_δ(modulus_problem, δ_opt)
+   SteinMinimaxEstimator(Zs_discr, gmix, target, modulus_problem;
+                         δ = δ_opt, δ_tuner = δ_tuner)
+end
+
+
 function SteinMinimaxEstimator(Z::DiscretizedStandardNormalSamples,
-                                    prior_class::GaussianMixturePriorClass,
-                                    target::EBayesTarget,
-                                    model::JuMP.Model)
+                               prior_class::GaussianMixturePriorClass,
+                               target::LinearEBayesTarget,
+                               model::JuMP.Model;
+                               δ = get_δ(model),
+                               δ_tuner = FixedDelta(δ)
+                              )
 
 
-    δ = MinimaxCalibratedEBayes.get_δ(model)
     ω_δ = objective_value(model)
     ω_δ_prime = -JuMP.dual(model[:bound_delta])
 
@@ -331,6 +360,8 @@ function SteinMinimaxEstimator(Z::DiscretizedStandardNormalSamples,
                           max_bias=max_bias,
                           unit_var_proxy=unit_var_proxy,
                           n=n,
+                          δ_opt = δ,
+                          δ_tuner = δ_tuner,
                           model=model)
 end
 
