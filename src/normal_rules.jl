@@ -117,3 +117,7 @@ end
 #gh = gausshermite(n)
 #nodes = gh[1].*(sqrt(2)*(σ)) .+ μ
 #weights = gh[2]./sqrt(pi)
+
+# TODO:
+
+ # Type MarginalDistribution()...

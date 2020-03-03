@@ -160,3 +160,24 @@ end
 function pretty_label(target::PosteriorTarget{PM} where PM<:PosteriorMeanNumerator)
 	L"\theta(x) = E[\mu | X=x]"
 end
+
+
+#------------------ Calibration---------------------------------
+
+#---------Should probably just turn this all into one function-----
+struct CalibratedTarget{T <: PosteriorTarget, S<:Real} <: LinearEBayesTarget
+    post::PosteriorTarget
+    θ̄::S #Pilot
+end
+
+#function (target::CalibratedTarget)(prior)
+#	target.post.num_target(prior) -
+#end
+
+
+#function riesz_representer(target::CalibratedTarget, t)
+#    x = target.num.x
+#    θ̄ = target.θ̄
+#    riesz_representer(target.num, t) - θ̄*riesz_representer(MarginalDensityTarget(x),t)
+#end
+#------

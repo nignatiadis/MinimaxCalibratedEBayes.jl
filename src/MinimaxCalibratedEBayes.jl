@@ -15,11 +15,12 @@ using KernelDensity
 using LaTeXStrings
 using LinearAlgebra
 using Optim
-using QuadGK
-using Setfield
+using OrthogonalPolynomialsQuasi
+using Plots
 using RecipesBase
 using Roots
-using Plots
+using Setfield
+using QuadGK
 
 import StatsBase:confint,
 				 fit,
@@ -58,6 +59,7 @@ include("butucea_comte.jl")
 include("prior_convex_class.jl")
 include("load_datasets.jl")
 include("helper_plots.jl")
+include("hermite.jl")
 
 
 export MCEBHistogram,
