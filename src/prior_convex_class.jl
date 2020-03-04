@@ -112,7 +112,7 @@ function get_δ(model; recalculate_δ = false)
 end
 
 function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
-                                    prior_class::GaussianMixturePriorClass,
+                                    prior_class::ConvexPriorClass,
                                     target::EBayesTarget)
 
     model = Model(with_optimizer(prior_class.solver; prior_class.solver_params...))
@@ -126,13 +126,13 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
     model[:fs2] = fs2
 
     if (!isnothing(Z.f_max))
-        idx_upper = findall( Z.f_max .< 1/sqrt(2π))
+        idx_upper = 1:length(Z.f_min) #findall( Z.f_max .< 1/sqrt(2π))
         @constraint(model, f1_upper, fs1[idx_upper] .<= Z.f_max[idx_upper])
         @constraint(model, f2_upper, fs2[idx_upper] .<= Z.f_max[idx_upper])
     end
 
     if (!isnothing(Z.f_min))
-        idx_nonzero = findall( Z.f_min .> 0.0)
+        idx_nonzero = 1:length(Z.f_min) #findall( Z.f_min .> 0.0)
         @constraint(model, f1_lower, fs1[idx_nonzero] .>= Z.f_min[idx_nonzero])
         @constraint(model, f2_lower, fs2[idx_nonzero] .>= Z.f_min[idx_nonzero])
     end
@@ -225,7 +225,7 @@ struct RMSE <: BiasVarAggregate
     δ_min::Float64
 end
 
-(rmse::RMSE)(bias, unit_var_proxy) = sqrt(bias^2 + unit_var_proxy/rmse.n)
+(rmse::RMSE)(bias, unit_var_proxy) =  sqrt(bias^2*rmse.n + unit_var_proxy) # sqrt(bias^2 + unit_var_proxy/rmse.n)
 
 struct HalfCIWidth <: BiasVarAggregate
     n::Integer
@@ -308,7 +308,7 @@ end
 
 
 function SteinMinimaxEstimator(Z::DiscretizedStandardNormalSamples,
-                               prior_class::GaussianMixturePriorClass,
+                               prior_class::ConvexPriorClass,
                                target::LinearEBayesTarget,
                                model::JuMP.Model;
                                δ = get_δ(model),
@@ -367,6 +367,26 @@ end
 
 
 
+#function target_bias_std(target::EBayesTarget,
+#	                     fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;
+#	                     bias_corrected=true,
+#						 clip=true)
+#(estimated_target = target_value,
+# estimated_bias = target_bias,
+ #estimated_std = sqrt(target_variance))
+#end
+
+#function Distributions.estimate(target::EBayesTarget, fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel; kwargs...)
+#target_bias_std(target, fcef; kwargs...)[:estimated_target]
+#end
+
+#function StatsBase.confint(target::EBayesTarget,
+ #                      fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;
+ #                      level::Real = 0.9,
+  #                     worst_case_bias_adjusted = true,
+  #                     clip = true)
+
+  #                     L,U
 
 @userplot SteinMinimaxPlot
 

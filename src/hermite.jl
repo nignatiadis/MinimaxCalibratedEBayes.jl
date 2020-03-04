@@ -15,7 +15,7 @@ end
 
 hermite_cf_coefficient(order) = im^(order-1)*sqrt(2*π)
 
-#fourier_transform(t, order) = hermite_fun(t, order)*cf_coefficient(order)
+#fourier_transform(t, order) = hermite_fun(t, order)*hermite_cf_coefficient(order)
 
 struct HermiteBasisFunction
 	q::Integer
@@ -43,7 +43,7 @@ Base.@kwdef mutable struct HermitePriorClass <: ConvexPriorClass
 	q::Integer
 	sobolev_order::Integer #not necessarily but should suffice for now
 	sobolev_bound::Float64
-	integrator = E_hermite
+	integrator = DEFAULT_HERMITE_INTEGRATOR
 	solver = nothing
 	solver_params = ()
 	cached_integrals = nothing
@@ -53,9 +53,21 @@ function add_prior_variables!(model::JuMP.Model, hermite_class::HermitePriorClas
     q = hermite_class.q
     tmp_vars = @variable(model, [i=1:q])
     model[Symbol(var_name)] = tmp_vars
-	cf_coefs = cf_coefficient.(1:q)
+	cf_coefs = hermite_cf_coefficient.(1:q)
 	con = @constraint(model, dot(tmp_vars, real.(cf_coefs)) == 1.0)
 	con2 = @constraint(model, dot(tmp_vars, imag.(cf_coefs)) == 0.0)
+	tmp_grid = -3:0.1:3
+	# rewrite below
+	A_mat_prior = [hermite_fun(x, qidx)  for x in tmp_grid, qidx=1:q]
+	nonneg_constraint = @constraint(model, A_mat_prior*tmp_vars .>= -0.1)
+
+	integrator2 = expectation(Normal(0, 1/sqrt(2)); n=31)
+	ft_mat = [hermite_fun_noexp(x, qidx)*hermite_cf_coefficient(qidx)*(x^2+1)  for x in integrator2.nodes, qidx=1:q]
+	real_ft = real(ft_mat) * tmp_vars
+	imag_ft = imag(ft_mat) * tmp_vars
+
+	@constraint(model, sum( real_ft.^2 .* integrator2.weights) + sum( imag_ft.^2 .* integrator2.weights) <= 2.0)
+
     tmp_vars
 end
 
@@ -92,6 +104,9 @@ end
 
 function marginalize(hermite_dbn::HermiteQuasiDistribution,
                      Zs_discr::DiscretizedStandardNormalSamples)
+	#temporary hack
+   hm_prior_class = HermitePriorClass(q=hermite_dbn.q,
+                    sobolev_order =2 , sobolev_bound = 10.0)
    ws = marginalize(hm_prior_class, Zs_discr, hermite_dbn.coefs)
    mhist = Zs_discr.mhist
    mhist = @set mhist.hist.weights = ws
