@@ -225,7 +225,7 @@ struct RMSE <: BiasVarAggregate
     δ_min::Float64
 end
 
-(rmse::RMSE)(bias, unit_var_proxy) =  sqrt(bias^2*rmse.n + unit_var_proxy) # sqrt(bias^2 + unit_var_proxy/rmse.n)
+(rmse::RMSE)(bias, unit_var_proxy) =  sqrt(bias^2 + unit_var_proxy/rmse.n)
 
 struct HalfCIWidth <: BiasVarAggregate
     n::Integer

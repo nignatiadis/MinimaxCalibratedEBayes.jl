@@ -37,6 +37,8 @@ import Distributions:cf,
                      location,
 					 loglikelihood
 
+import Expectations:expectation
+
 import Base:extrema,
 			step,
             first,
