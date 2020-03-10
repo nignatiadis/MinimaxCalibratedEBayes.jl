@@ -13,7 +13,7 @@ mutable struct GaussianMixturePriorClass{T<:Real,
 end
 
 GaussianMixturePriorClass(σ_prior, grid, solver) = GaussianMixturePriorClass(σ_prior, grid, solver, ())
-GaussianMixturePriorClass(σ_prior, grid) = GaussianMixturePriorClass(σ_prior, grid, Gurobi.Optimizer)
+#GaussianMixturePriorClass(σ_prior, grid) = GaussianMixturePriorClass(σ_prior, grid, Gurobi.Optimizer)
 
 length(gmix_class::GaussianMixturePriorClass) = length(gmix_class.grid)
 location(gmix_class::GaussianMixturePriorClass) = gmix_class.grid
@@ -63,33 +63,63 @@ end
 # want to map: probs ->
 
 
+function worst_case_bias(general_Q,
+                  Z::DiscretizedStandardNormalSamples,
+                  gmix_class::ConvexPriorClass,
+                  target::LinearEBayesTarget;
+                  boundary_mass = Inf)
+     grid = Z.mhist.grid
+     tmpcalib = DiscretizedAffineEstimator(MCEBHistogram(grid), general_Q)
+     worst_case_bias(tmpcalib, Z, gmix_class, target; boundary_mass=boundary_mass)
+end
 
 function worst_case_bias(Q::DiscretizedAffineEstimator,
                   Z::DiscretizedStandardNormalSamples,
-                  gmix_class::GaussianMixturePriorClass,
-                  target::EBayesTarget;
-                  maximization=true)
+                  gmix_class::ConvexPriorClass,
+                  target::LinearEBayesTarget;
+                  boundary_mass = Inf)
 
     model = Model(with_optimizer(gmix_class.solver; gmix_class.solver_params...))
     πs = add_prior_variables!(model, gmix_class; var_name = "πs")
     fs = marginalize(gmix_class, Z, πs)
     L = linear_functional(gmix_class, target, πs)
 
+
+    if (!isnothing(Z.f_max))
+        @constraint(model, f1_upper, fs .<= Z.f_max)
+    end
+
+    if (!isnothing(Z.f_min))
+        @constraint(model, f1_lower, fs .>= Z.f_min[idx_nonzero])
+    end
+
+    if boundary_mass < Inf
+        @constraint(model, fs[1] <= boundary_mass)
+        @constraint(model, fs[end] <= boundary_mass)
+    end
     #    @constraint(jm, f3 .- f_marginal .<= C*h_marginal_grid)
     #    @constraint(jm, f3 .- f_marginal .>= -C*h_marginal_grid)
     #end
 
-    if maximization
-        @objective(model, Max, Q.Qo + dot(Q.Q,fs) - L)
-    else
-        @objective(model, Min, Q.Qo + dot(Q.Q,fs) - L)
-    end
 
+    @objective(model, Max, Q.Qo + dot(Q.Q,fs) - L)
     optimize!(model)
-    obj_val = objective_value(model)
+    max_bias = objective_value(model)
+    max_g = gmix_class(JuMP.value.(πs))
 
-    (max_worst_g = gmix_class(JuMP.value.(πs)),
-     max_bias = obj_val)
+
+    @objective(model, Min, Q.Qo + dot(Q.Q,fs) - L)
+    optimize!(model)
+    min_bias = objective_value(model)
+    min_g = gmix_class(JuMP.value.(πs))
+
+    max_abs_bias = max(abs(max_bias), abs(min_bias))
+
+    (max_abs_bias = max_abs_bias,
+     max_squared_bias = max_abs_bias^2,
+     max_bias = max_bias, min_bias = min_bias,
+     max_g = max_g, min_g = min_g,
+     model = model)
 end
 
 
@@ -204,6 +234,11 @@ end
 function optimal_δ(model::JuMP.Model, objective::FixedDelta)
     objective.δ
 end
+
+#struct VarProxyUpperBound <: DeltaTuner
+#
+#end
+
 
 abstract type BiasVarAggregate <:DeltaTuner end
 

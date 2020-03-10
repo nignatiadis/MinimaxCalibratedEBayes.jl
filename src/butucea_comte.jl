@@ -1,15 +1,78 @@
-struct ButuceaComte{T<:EBayesTarget}
-    target::EBayesTarget
-    h::Float64 # not really bandwidth -> truncation limit...
+# algorithm type
+struct ButuceaComte end
+
+struct ButuceaComteEstimator{EBT<:LinearEBayesTarget}
+    target::EBT
+    h::Float64
 end
 
-function default_bandwidth(::Type{ButuceaComte},
+# Make theoretical results of BC practical.
+Base.@kwdef struct ButuceaComteNoiseDensityParams{T <: Real}
+    γ::T
+    α::T
+    ρ::T
+    κ0upper::T
+    κ0lower::T
+end
+
+function ButuceaComteNoiseDensityParams(Z::StandardNormalSample)
+    ButuceaComteNoiseDensityParams(γ = 0.0, ρ = 2.0, α = 0.5, κ0upper=1.0, κ0lower=1.0)
+end
+
+Base.@kwdef struct ButuceaComteSobolevParams{T<:Real}
+   b::T
+   L::T        # constant
+   a::T = 0.0
+   r::T = 0.0
+end
+
+Base.@kwdef struct ButuceaComteTargetParams{T<:Real}
+   B::T        #polynomial decay (1+x^2)^B
+   A::T
+   R::T
+   Cψ::T       #constant
+end
+
+function ButuceaComteTargetParams(target::PriorDensityTarget)
+    ButuceaComteTargetParams(A=0.0, B=0.0, R=0.0, Cψ=1.0)
+end
+
+# only accounting for b,B for now
+function butucea_comte_squared_bias_bound(noise::ButuceaComteNoiseDensityParams,
+                                  sobolev::ButuceaComteSobolevParams,
+                                  target::ButuceaComteTargetParams,
+                                  h::Real)
+    R = target.R
+    r = sobolev.r
+
+    a = target
+    B = target.B
+    b = sobolev.b
+
+    L = sobolev.L
+    Cψ = target.Cψ
+
+    L*Cψ/π/(2b + 2B -1)*h^(1-2b-2B)
+end
+
+# only do case PriorDensityTarget for now
+function butucea_comte_unit_var_proxy(h::Real)
+    1/π^2*exp(h^2/2)/h^2
+end
+
+
+
+function default_bandwidth(::ButuceaComte,
                            target::MarginalDensityTarget{<:StandardNormalSample},
                            n)
     sqrt(log(n))
 end
 
-function default_bandwidth(::Type{ButuceaComte},
+
+
+
+
+function default_bandwidth(::ButuceaComte,
                            target::PriorDensityTarget,
                            n)
     # should make this also depend on noise distribution etc ...
@@ -19,16 +82,13 @@ function default_bandwidth(::Type{ButuceaComte},
 end
 
 
-function ButuceaComte(target::EBayesTarget, h::Float64)
-    ButuceaComte{typeof(target)}(target, h)
-end
 
-function ButuceaComte(target::EBayesTarget, n::Int64)
+function ButuceaComteEstimator(target::EBayesTarget; n::Int64)
     h = default_bandwidth(ButuceaComte, target, n)
     ButuceaComte(target, h)
 end
 
-function (cb::ButuceaComte)(z)
+function (cb::ButuceaComteEstimator)(z)
     h = cb.h
     target = cb.target
     f(t) = real(exp(im*t*z)*cf(target,-t)/cf(Normal(),t))
@@ -36,7 +96,7 @@ function (cb::ButuceaComte)(z)
     res/2/π
 end
 
-function DiscretizedAffineEstimator(mhist, cb::ButuceaComte)
+function DiscretizedAffineEstimator(mhist, cb::ButuceaComteEstimator)
     DiscretizedAffineEstimator(mhist, z -> cb(z))
 end
 

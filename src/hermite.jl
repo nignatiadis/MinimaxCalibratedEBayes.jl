@@ -66,7 +66,7 @@ function add_prior_variables!(model::JuMP.Model, hermite_class::HermitePriorClas
 	nparams = qmax + 1
     tmp_vars = @variable(model, [i=1:nparams])
     model[Symbol(var_name)] = tmp_vars
-	cf_coefs = hermite_cf_coefficient.(0:qmax)
+	cf_coefs = hermite_cf_coefficient.(0:qmax) .* hermite_fun_noexp.(0.0, 0:qmax)
 	con = @constraint(model, dot(tmp_vars, real.(cf_coefs)) == 1.0)
 	con2 = @constraint(model, dot(tmp_vars, imag.(cf_coefs)) == 0.0)
 	#tmp_grid = -7:0.02:4
@@ -79,9 +79,9 @@ function add_prior_variables!(model::JuMP.Model, hermite_class::HermitePriorClas
 	b = hermite_class.sobolev_order
 	sobolev_bound = sqrt(hermite_class.sobolev_bound*2π)
 
-	ft_mat = [hermite_fun_noexp(x, qidx)*hermite_cf_coefficient(qidx)*(x^2+1)^b  for x in integrator2.nodes, qidx=0:qmax]
-	real_ft = (real(ft_mat) * tmp_vars) .* sqrt.(integrator2.weights)
-	imag_ft = imag(ft_mat) * tmp_vars .* sqrt.(integrator2.weights)
+	ft_mat = [hermite_fun_noexp(x, qidx)*hermite_cf_coefficient(qidx)  for x in integrator2.nodes, qidx=0:qmax]
+	real_ft = (real(ft_mat) * tmp_vars) .* sqrt.(integrator2.weights .* (integrator2.nodes.^2 .+ 1).^b)
+	imag_ft = imag(ft_mat) * tmp_vars .* sqrt.(integrator2.weights .* (integrator2.nodes.^2 .+ 1).^b)
 
 	@constraint(model, [sobolev_bound; real_ft; imag_ft] in SecondOrderCone())
 

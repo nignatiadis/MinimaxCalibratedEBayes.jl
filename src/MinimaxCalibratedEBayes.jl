@@ -14,6 +14,7 @@ using JuMP
 using KernelDensity
 using LaTeXStrings
 using LinearAlgebra
+using MathOptInterface
 using Optim
 using OrthogonalPolynomialsQuasi
 using Plots
@@ -59,7 +60,7 @@ include("marginal_kde.jl")
 include("logspline_g_new.jl")
 include("butucea_comte.jl")
 include("prior_convex_class.jl")
-include("load_datasets.jl")
+include("sinkhorn.jl")
 include("helper_plots.jl")
 include("hermite.jl")
 
