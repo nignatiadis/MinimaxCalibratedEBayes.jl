@@ -28,6 +28,7 @@ import StatsBase:confint,
                  Histogram,
                  binindex,
                  midpoints,
+				 nobs,
                  response
 
 import Statistics:var
@@ -36,11 +37,15 @@ import Distributions:cf,
                      estimate,
                      pdf,
                      location,
-					 loglikelihood
+					 loglikelihood,
+					 support,
+					 DiscreteNonParametric
+
 
 import Expectations:expectation
 
-import Base:extrema,
+import Base:eltype,
+            extrema,
 			step,
             first,
             last,
@@ -61,6 +66,7 @@ include("logspline_g_new.jl")
 include("butucea_comte.jl")
 include("prior_convex_class.jl")
 include("sinkhorn.jl")
+include("npmle.jl")
 include("helper_plots.jl")
 include("hermite.jl")
 

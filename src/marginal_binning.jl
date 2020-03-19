@@ -43,7 +43,7 @@ struct DiscretizedStandardNormalSamples{MH<:MCEBHistogram,
                                        Tvar,
                                        Tmin,
                                        Tmax}
-    mhist::MH                                   
+    mhist::MH
     idx::IX
     var_proxy::Tvar
     f_min::Tmin
@@ -74,9 +74,47 @@ function DiscretizedStandardNormalSamples(Zs::AbstractVector{<:StandardNormalSam
     DiscretizedStandardNormalSamples(mhist, idx, var_proxy, f_min, f_max)
 end
 
-response(Z_discr::DiscretizedStandardNormalSamples) = Z_discr.mhist.hist # what I want to say.
+# point is ... can think of above as Int{K} in MLJ-lang
+function DiscretizedStandardNormalSamples(mhist::MCEBHistogram;
+                                          var_proxy=1/sqrt(2*pi),
+                                          f_min=nothing,
+                                          f_max=nothing)
+    DiscretizedStandardNormalSamples(mhist, nothing, var_proxy, f_min, f_max)
+end
 
-length(Z_discr::DiscretizedStandardNormalSamples) = sum(Z_discr.mhist.hist.weights)
+response(Z_discr::DiscretizedStandardNormalSamples) = Z_discr.mhist.hist # what I want to say.
+nobs(Z_discr::DiscretizedStandardNormalSamples) = sum(Z_discr.mhist.hist.weights)
+nbins(Z_discr::DiscretizedStandardNormalSamples) = length(Z_discr.mhist.grid) + 1
+#eltype(Z_discr::DiscretizedStandardNormalSamples) = eltype(Z_discr.mhist.grid)
+#length(Z_discr::DiscretizedStandardNormalSamples) = sum(Z_discr.mhist.hist.weights)
+
+function support(Z_discr::DiscretizedStandardNormalSamples)
+    mhist = Z_discr.mhist
+    supp = zeros(eltype(mhist.grid), nbins(Z_discr))
+    supp[2:(end-1)] = StatsBase.midpoints(mhist.grid)
+
+    # replace by gap just adjacent
+    h = step(Z_discr.mhist.grid)
+    supp[1] = mhist.grid[1] - h/2
+    supp[end] =  mhist.grid[end] + h./2
+    supp
+end
+
+function set_neighborhood(Zs::DiscretizedStandardNormalSamples,
+                          prior::Distribution;
+                          C∞_density = Inf,
+                          min_var_proxy = (C∞_density < Inf) ? C∞_density : 0.0)
+
+   f = pdf(marginalize(prior, Zs))
+   Zs = @set Zs.var_proxy = max.(f, min_var_proxy)
+   C∞ = C∞_density
+   if C∞ < Inf
+       Zs = @set Zs.f_max = f .+ C∞
+       Zs = @set Zs.f_min = max.( f .- C∞, 0.0)
+   end
+   Zs
+end
+
 
 struct DiscretizedStandardNormalSample{DISC<:DiscretizedStandardNormalSamples}
     samples::DISC
@@ -90,6 +128,16 @@ function (Zs_disc::DiscretizedStandardNormalSamples)(i::Int)
     DiscretizedStandardNormalSample(Zs_disc, i)
 end
 
+# convert to discretenonparametric dbn
+function DiscreteNonParametric(Zs_discr::DiscretizedStandardNormalSamples)
+    supp = support(Zs_discr)
+    probs = pdf(Zs_discr.mhist)
+    DiscreteNonParametric(supp, probs)
+end
+
+function DiscreteNonParametric(Zs_discr::MCEBHistogram)
+   DiscreteNonParametric(DiscretizedStandardNormalSamples(Zs_discr))
+end
 
 
 

@@ -145,19 +145,3 @@ function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
     Zs_discr = @set Zs_discr.f_max = f_max
     Zs_discr
 end
-
-
-function set_neighborhood(Zs::DiscretizedStandardNormalSamples,
-                          prior::Distribution;
-                          C∞_density = Inf,
-                          min_var_proxy = (C∞_density < Inf) ? C∞_density : 0.0)
-
-   f = pdf(marginalize(prior, Zs))
-   Zs = @set Zs.var_proxy = max.(f, min_var_proxy)
-   C∞ = C∞_density
-   if C∞ < Inf
-       Zs = @set Zs.f_max = f .+ C∞
-       Zs = @set Zs.f_min = max.( f .- C∞, 0.0)
-   end
-   Zs
-end
