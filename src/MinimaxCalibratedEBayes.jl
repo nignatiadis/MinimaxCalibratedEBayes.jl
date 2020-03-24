@@ -69,6 +69,7 @@ include("sinkhorn.jl")
 include("npmle.jl")
 include("helper_plots.jl")
 include("hermite.jl")
+include("main_mceb.jl")
 
 
 export MCEBHistogram,
@@ -95,7 +96,8 @@ export MCEBHistogram,
 	   confint,
 	   confintplot,
 	   confintplot!,
-	   set_neighborhood
+	   set_neighborhood,
+	   MinimaxCalibratorSetup
 
 
 end # module

@@ -62,7 +62,7 @@ function loglikelihood(prior::ContinuousExponentialFamily,
                        Zs_discr::DiscretizedStandardNormalSamples;
                        integrator = expectation(prior.base_measure; n=200),
 					   normalize=true)
-	n = normalize ? length(Zs_discr) : 1
+	n = normalize ? nobs(Zs_discr) : 1
     mhist = Zs_discr.mhist # need to be a bit careful...
     n_weights =  lastindex(mhist)
     ll = 0
@@ -112,23 +112,29 @@ function fit(cefm::ContinuousExponentialFamilyModel,
 	         Zs::Union{EBayesSamples, DiscretizedStandardNormalSamples};
 			 integrator = expectation(cefm.base_measure; n=50),
 			 c0 = 1e-6,
-			 solver = Newton(),
-			 optim_options = Optim.Options(show_trace=true, show_every=1, g_tol=1e-6)) # to stabilize optimization
+			 solver = NewtonTrustRegion(),
+			 optim_options = Optim.Options(show_trace=true, show_every=1, g_tol=1e-6),
+			 initializer = LindseyMethod(500)) # to stabilize optimization
 
-			 n = length(Zs)
+			 n = nobs(Zs)
 			 # initialize method through Lindsey's method
 			 # this mostly makes sense for normal Zs
-			 fit_lindsey = fit(cefm, response(Zs), LindseyMethod(500))
+			 if isa(initializer, LindseyMethod)
+			 	fit_init = fit(cefm, response(Zs), initializer)
+			 	α_init = fit_init.α
+			 else
+				α_init = initializer
+			 end
  		 	# set up objective
 			 function _nll(α)
 				 exp_family = cefm(α; integrator=integrator)
 				 -loglikelihood(exp_family, Zs; integrator=integrator, normalize=true)
 			 end
-			 _s(α) = c0*sum(abs2, α)/n# c0*norm(α)/n #allow other choices
+			 _s(α) = c0*norm(α)/n #sum(abs2, α)/n# c0*norm(α)/n #allow other choices
  			 _penalized_nll(α) = _nll(α) + _s(α)
 
 			 # ready to descend
-			 optim_res = optimize(_penalized_nll, fit_lindsey.α,
+			 optim_res = optimize(_penalized_nll, α_init,
 			                          solver, optim_options;
 			 						 autodiff = :forward)
 
@@ -198,7 +204,7 @@ end
 function StatsBase.confint(target::EBayesTarget,
 	                       fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;
 						   level::Real = 0.9,
-						   worst_case_bias_adjusted = true,
+						   worst_case_bias_adjusted = false,
 						   clip = true)
     if worst_case_bias_adjusted
 		res = target_bias_std(target, fcef;
