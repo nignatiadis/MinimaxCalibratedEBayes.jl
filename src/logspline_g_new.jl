@@ -107,13 +107,29 @@ end
 Base.broadcastable(fcef::FittedContinuousExponentialFamilyModel) = Ref(fcef)
 
 
+@with_kw struct ExponentialFamilyDeconvolutionMLE{CEFM<:ContinuousExponentialFamilyModel,
+	                                           T <: Real}
+	cefm::CEFM
+	c0::T = 0.01
+	integrator = expectation(cefm.base_measure; n=50)
+	solver = NewtonTrustRegion()
+	optim_options = Optim.Options(show_trace=true, show_every=1, g_tol=1e-6)
+	initializer = LindseyMethod(500)
+end
+
+
 function fit(cefm::ContinuousExponentialFamilyModel,
 	         Zs::Union{EBayesSamples, DiscretizedStandardNormalSamples};
-			 integrator = expectation(cefm.base_measure; n=50),
-			 c0 = 1e-6,
-			 solver = NewtonTrustRegion(),
-			 optim_options = Optim.Options(show_trace=true, show_every=1, g_tol=1e-6),
-			 initializer = LindseyMethod(500)) # to stabilize optimization
+			 kwargs...)
+    deconv = ExponentialFamilyDeconvolutionMLE(cefm=cefm, kwargs...)
+	fit(deconv, Zs)		 
+end			 
+
+function fit(deconv::ExponentialFamilyDeconvolutionMLE,
+	         Zs::Union{EBayesSamples, DiscretizedStandardNormalSamples})
+			 
+			 cefm = deconv.cefm
+			 @unpack c0, integrator, solver, optim_options, initializer = deconv
 
 			 n = nobs(Zs)
 			 # initialize method through Lindsey's method
