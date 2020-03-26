@@ -12,17 +12,72 @@
 # -
 
 
-Base.@kwdef mutable struct MinimaxCalibratorSetup{T<:EBayesTarget,
-                                           DS <: DiscretizedStandardNormalSamples,
+#Base.@kwdef MinimaxCalibratorOptions{I<:}
+   # how to split into test <-> train
+   # prior class
+   # discretization option
+   # infty_band_options:: KDEInfinityBand
+   # tuner...
+   # pilot settings
+#end 
+
+
+
+"""
+    _split_data(n_total::Int64)
+    _split_data(Zs::AbstractVector)
+    
+Helper functions to partition all observations
+into two disjoint folds
+"""
+function _split_data(n_total::Int64)
+    n_half = ceil(Int, n_total/2)
+    idx_test = sample(1:n_total, n_half, replace=false)
+    idx_train = setdiff(1:n_total, idx_test)
+    idx_train, idx_test
+end
+
+function _split_data(Zs::AbstractVector)
+    n = length(Zs)
+    idx_train, idx_test = _split_data(n)
+    Zs[idx_train], Zs[idx_test], idx_train, idx_test
+end
+
+
+function _default_tuner(Zs_test_discr)
+    RMSE(nobs(Zs_test_discr), 0.0)
+end
+
+# train => first fold
+# test -> second fold
+Base.@kwdef mutable struct MinimaxCalibratorSetup{DS <: DiscretizedStandardNormalSamples,
+                                           IDX,
+                                           ES,
                                            Gcal <: ConvexPriorClass,
-                                           DT <: DeltaTuner}
-    Zs_test
-    Zs_train
-    target::T
+                                           DT <: DeltaTuner,
+                                           P,
+                                           NB}
+    Zs_train::ES
+    Zs_test::ES
+    idx_train::IDX = nothing
+    idx_test::IDX = nothing
     prior_class::Gcal
-    Zs_discr_test::DS
-    delta_tuner::DT
-    pilot
+    fkde_train::NB = nothing
+    Zs_test_discr::DS
+    delta_tuner::DT = _default_tuner(Zs_test_discr)
+    pilot_method::P # = _default_pilot(Zs_test_discr)
+end
+
+
+function StatsBase.fit(mceb_setup::MinimaxCalibratorSetup, target::LinearEBayesTarget)
+	@unpack Zs_test_discr, prior_class, delta_tuner = mceb_setup
+	model = initialize_modulus_problem(Zs_test_discr, prior_class, target)
+	opt_δ = optimal_δ(model, delta_tuner)
+	modulus_at_δ!(model, opt_δ)
+	sm  = SteinMinimaxEstimator(Zs_test_discr,
+	                            prior_class,
+	                            target,
+	                            model)
 end
 
 

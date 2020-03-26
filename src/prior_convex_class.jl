@@ -141,6 +141,22 @@ function get_δ(model; recalculate_δ = false)
     end
 end
 
+function idx_enforce_lower_bound(prior_class::ConvexPriorClass, Z::DiscretizedStandardNormalSamples)
+    1:length(Z.fmin)
+end 
+
+function idx_enforce_lower_bound(prior_class::GaussianMixturePriorClass, Z::DiscretizedStandardNormalSamples)
+    findall( Z.f_min .> 0.0)
+end 
+
+function idx_enforce_upper_bound(prior_class::ConvexPriorClass, Z::DiscretizedStandardNormalSamples)
+    1:length(Z.fmax)
+end 
+
+function idx_enforce_upper_bound(prior_class::GaussianMixturePriorClass, Z::DiscretizedStandardNormalSamples)
+    findall( Z.f_max .< 1/sqrt(2π))
+end 
+
 function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
                                     prior_class::ConvexPriorClass,
                                     target::EBayesTarget)
@@ -156,13 +172,13 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
     model[:fs2] = fs2
 
     if (!isnothing(Z.f_max))
-        idx_upper = 1:length(Z.f_min) #findall( Z.f_max .< 1/sqrt(2π))
+        idx_upper = idx_enforce_upper_bound(prior_class, Z)#
         @constraint(model, f1_upper, fs1[idx_upper] .<= Z.f_max[idx_upper])
         @constraint(model, f2_upper, fs2[idx_upper] .<= Z.f_max[idx_upper])
     end
 
     if (!isnothing(Z.f_min))
-        idx_nonzero = 1:length(Z.f_min) #findall( Z.f_min .> 0.0)
+        idx_nonzero = idx_enforce_lower_bound(prior_class, Z) #
         @constraint(model, f1_lower, fs1[idx_nonzero] .>= Z.f_min[idx_nonzero])
         @constraint(model, f2_lower, fs2[idx_nonzero] .>= Z.f_min[idx_nonzero])
     end
@@ -194,7 +210,7 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
     model
 end
 
-function modulus_at_δ(model, δ)
+function modulus_at_δ!(model, δ)
     set_normalized_rhs(model[:bound_delta], δ)
     optimize!(model)
     model
@@ -206,7 +222,7 @@ function δ_path(model, δs)
     max_biases = Vector{Float64}(undef, length(δs))
     unit_variances   = Vector{Float64}(undef, length(δs))
     for (i,δ) in enumerate(δs)
-        model = modulus_at_δ(model, δ)
+        model = modulus_at_δ!(model, δ)
         tmp_bias, tmp_var = get_bias_var(model)
         max_biases[i] = tmp_bias
         unit_variances[i] = tmp_var
@@ -281,7 +297,7 @@ end
 
 
 function optimal_δ(model::JuMP.Model, objective::BiasVarAggregate)
-    f = δ -> objective(modulus_at_δ(model, δ))
+    f = δ -> objective(modulus_at_δ!(model, δ))
     δ_max = model[:δ_max]
     δ_min = objective.δ_min
     Optim.optimize(f, δ_min, δ_max).minimizer
@@ -336,7 +352,7 @@ function SteinMinimaxEstimator(Zs_discr::DiscretizedStandardNormalSamples,
 
    modulus_problem = initialize_modulus_problem(Zs_discr, gmix, target)
    δ_opt = optimal_δ(modulus_problem, δ_tuner)
-   modulus_problem = modulus_at_δ(modulus_problem, δ_opt)
+   modulus_problem = modulus_at_δ!(modulus_problem, δ_opt)
    SteinMinimaxEstimator(Zs_discr, gmix, target, modulus_problem;
                          δ = δ_opt, δ_tuner = δ_tuner)
 end

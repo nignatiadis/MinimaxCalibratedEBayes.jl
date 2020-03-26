@@ -60,6 +60,7 @@ import Base.Broadcast: broadcastable
 
 include("bias_adjusted_ci.jl")
 include("marginal_binning.jl")
+include("helper_plots.jl")
 include("inference_targets.jl")
 include("normal_rules.jl")
 include("marginal_kde.jl")
@@ -68,7 +69,6 @@ include("butucea_comte.jl")
 include("prior_convex_class.jl")
 include("sinkhorn.jl")
 include("npmle.jl")
-include("helper_plots.jl")
 include("hermite.jl")
 include("main_mceb.jl")
 include("load_datasets.jl")
@@ -101,7 +101,8 @@ export MCEBHistogram,
 	   confintplot,
 	   confintplot!,
 	   set_neighborhood,
-	   MinimaxCalibratorSetup
+	   MinimaxCalibratorSetup,
+	   ExponentialFamilyDeconvolutionMLE
 
 
 end # module
