@@ -62,7 +62,6 @@ function loglikelihood(prior::ContinuousExponentialFamily,
                        Zs_discr::DiscretizedStandardNormalSamples;
                        integrator = expectation(prior.base_measure; n=200),
 					   normalize=true)
-	n = normalize ? nobs(Zs_discr) : 1
     mhist = Zs_discr.mhist # need to be a bit careful...
     n_weights =  lastindex(mhist)
     ll = 0
