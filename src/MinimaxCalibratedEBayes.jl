@@ -17,6 +17,7 @@ using LinearAlgebra
 using MathOptInterface
 using Optim
 using OrthogonalPolynomialsQuasi
+using Parameters
 using Plots
 using RecipesBase
 using Roots
@@ -70,6 +71,7 @@ include("npmle.jl")
 include("helper_plots.jl")
 include("hermite.jl")
 include("main_mceb.jl")
+include("load_datasets.jl")
 
 
 export MCEBHistogram,
@@ -79,6 +81,8 @@ export MCEBHistogram,
        SincKernel,
        DeLaValleePoussinKernel,
        certainty_banded_KDE,
+	   KDEInfinityBandOptions,
+	   KDEInfinityBand,
        EBayesTarget,
        MarginalDensityTarget,
        PriorDensityTarget,

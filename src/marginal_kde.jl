@@ -8,7 +8,7 @@ struct SincKernel <: ContinuousUnivariateDistribution
    h::Float64 #Bandwidth
 end
 
-default_bandwidth(::Type{SincKernel}, m) = 1/sqrt(log(m))
+_default_bandwidth(::Type{SincKernel}, m::Integer) = 1/sqrt(log(m))
 SincKernel(; m = 1_000) = SincKernel(default_bandwidth(SincKernel, m))
 
 cf(a::SincKernel, t) = one(Float64)*(-1/a.h <= t <= 1/a.h)
@@ -26,7 +26,7 @@ struct DeLaValleePoussinKernel <: ContinuousUnivariateDistribution
 end
 
 
-default_bandwidth(a::Type{DeLaValleePoussinKernel}, m) = 1.5/sqrt(log(m))
+_default_bandwidth(a::Type{DeLaValleePoussinKernel}, m::Integer) = 1.5/sqrt(log(m))
 
 function DeLaValleePoussinKernel(; m = 1_000)
      DeLaValleePoussinKernel(default_bandwidth(DeLaValleePoussinKernel, m))
@@ -50,6 +50,18 @@ function pdf(a::DeLaValleePoussinKernel, t)
    end
 end
 
+Base.@kwdef struct KDEInfinityBandOptions{T<:Real, 
+                                         S<:Union{T, Nothing}}
+   a_min::T
+   a_max::T
+   npoints::Integer = 4096
+   bandwidth::S = nothing
+   kernel = DeLaValleePoussinKernel
+   nboot::Integer = 1000
+   η_infl::T = 1.1
+   n_interp::Integer = 25
+end
+
 
 Base.@kwdef struct KDEInfinityBand{T<:Real}
     C∞::T
@@ -58,13 +70,42 @@ Base.@kwdef struct KDEInfinityBand{T<:Real}
     fitted_kde
     interp_kde
     kernel
+    η_infl::T = 1.1
+    n_interp::Integer = 25
 end
 
+function _default_bandwidth(kernel, Xs::AbstractVector, ::Nothing)
+    _default_bandwidth(kernel, Xs)
+end 
+
+function _default_bandwidth(kernel, Xs::AbstractVector)
+    _default_bandwidth(kernel, length(Xs))
+end 
+
+function _default_bandwidth(kernel, Xs::AbstractVector, h::Number)
+    h
+end 
+
+function StatsBase.fit(opt::KDEInfinityBandOptions, Xs)
+    a_min = opt.a_min
+    a_max = opt.a_max
+    npoints = opt.npoints
+    kernel = opt.kernel
+    bandwidth = _default_bandwidth(kernel, Xs, opt.bandwidth)
+    nboot = opt.nboot
+    tmp_res = certainty_banded_KDE(Xs, a_min, a_max; npoints = npoints, 
+                         kernel = kernel, bandwidth = bandwidth,
+                         nboot = nboot)
+    tmp_res = @set tmp_res.η_infl = opt.η_infl
+    tmp_res = @set tmp_res.n_interp = opt.η_interp
+
+    tmp_res
+end
 
 function certainty_banded_KDE(Xs, a_min, a_max;
                         npoints = 4096,
                         kernel=DeLaValleePoussinKernel,
-                        bandwidth = default_bandwidth(kernel, length(Xs)),
+                        bandwidth = _default_bandwidth(kernel, length(Xs)),
                         nboot = 1_000)
 
     kernel = kernel(bandwidth)
@@ -105,10 +146,47 @@ function certainty_banded_KDE(Xs, Zs_discr::DiscretizedStandardNormalSamples; kw
     certainty_banded_KDE(Xs, a_min, a_max; kwargs...)
 end
 
+
+
+# plotting of infinite band
+
+
+function _get_density_bands(ys, c)
+    lower_lims = ys .- max.(ys .- c, 0)
+    upper_lims = copy(lower_lims)
+    upper_lims .= c
+    (lower_lims, upper_lims)
+end
+
+
+@recipe function f(ctband::KDEInfinityBand;
+                        show_bands=true)
+    y = ctband.fitted_kde.density
+    x = ctband.fitted_kde.x
+    xlim --> (ctband.a_min, ctband.a_max)
+    ylab --> "Density"
+
+    seriestype  -->  :path
+    linewidth --> 2
+    color --> :purple
+    
+    infty_bound = fkde_train.C∞ * fkde_train.η_infl
+    
+    if show_bands
+        _ys_lower, _ys_upper = _get_density_bands(_ys, infty_bound)
+        ribbons --> (_ys_lower, _ys_lower)
+        fillalpha --> 0.2
+    end
+
+    xlab --> "x"
+    x,y
+end
+
+
 function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
-                                fkde::MinimaxCalibratedEBayes.KDEInfinityBand;
-                                n_interp = 25,
-                                η_infl = 1.1) # todo add bias adjustment too
+                          fkde::MinimaxCalibratedEBayes.KDEInfinityBand;
+                          n_interp = 25,
+                          η_infl = 1.1) # todo add bias adjustment too
     grid = Zs_discr.mhist.grid
     fkde_interp = fkde.interp_kde.itp
     n = length(Zs_discr)
