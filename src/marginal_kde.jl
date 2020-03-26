@@ -97,8 +97,7 @@ function StatsBase.fit(opt::KDEInfinityBandOptions, Xs)
                          kernel = kernel, bandwidth = bandwidth,
                          nboot = nboot)
     tmp_res = @set tmp_res.η_infl = opt.η_infl
-    tmp_res = @set tmp_res.n_interp = opt.η_interp
-
+    tmp_res = @set tmp_res.n_interp = opt.n_interp
     tmp_res
 end
 
@@ -170,10 +169,10 @@ end
     linewidth --> 2
     color --> :purple
     
-    infty_bound = fkde_train.C∞ * fkde_train.η_infl
+    infty_bound = ctband.C∞ * ctband.η_infl
     
     if show_bands
-        _ys_lower, _ys_upper = _get_density_bands(_ys, infty_bound)
+        _ys_lower, _ys_upper = _get_density_bands(y, infty_bound)
         ribbons --> (_ys_lower, _ys_lower)
         fillalpha --> 0.2
     end
@@ -184,12 +183,13 @@ end
 
 
 function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
-                          fkde::MinimaxCalibratedEBayes.KDEInfinityBand;
-                          n_interp = 25,
-                          η_infl = 1.1) # todo add bias adjustment too
+                          fkde::MinimaxCalibratedEBayes.KDEInfinityBand)
+    
+    @unpack n_interp, η_infl = fkde 
+    @show     n_interp,   η_infl            
     grid = Zs_discr.mhist.grid
     fkde_interp = fkde.interp_kde.itp
-    n = length(Zs_discr)
+    n = nobs(Zs_discr)
 
     f_max = zeros(length(grid) + 1)
     f_min = zeros(length(grid) + 1)
