@@ -212,7 +212,9 @@ function target_bias_std(target::EBayesTarget,
 	 estimated_std = sqrt(target_variance))
 end
 
-
+function Distributions.estimate(target::EBayesTarget, fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel; kwargs...)
+	target_bias_std(target, fcef; kwargs...)[:estimated_target]
+end
 
 function StatsBase.confint(target::EBayesTarget,
 	                       fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;

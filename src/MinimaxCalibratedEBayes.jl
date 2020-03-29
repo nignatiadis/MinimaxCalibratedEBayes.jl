@@ -102,7 +102,8 @@ export MCEBHistogram,
 	   confintplot!,
 	   set_neighborhood,
 	   MinimaxCalibratorSetup,
-	   ExponentialFamilyDeconvolutionMLE
+	   ExponentialFamilyDeconvolutionMLE,
+	   MinimaxCalibratorOptions
 
 
 end # module

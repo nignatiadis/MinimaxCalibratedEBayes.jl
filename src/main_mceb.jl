@@ -12,23 +12,17 @@
 # -
 
 
-#Base.@kwdef MinimaxCalibratorOptions{I<:}
-   # how to split into test <-> train
-   # prior class
-   # discretization option
-   # infty_band_options:: KDEInfinityBand
-   # tuner...
-   # pilot settings
-#end 
+
 
 
 
 """
     _split_data(n_total::Int64)
     _split_data(Zs::AbstractVector)
-    
+	_split_data(Zs::AbstractVector, ::Symbol)
+
 Helper functions to partition all observations
-into two disjoint folds
+into two disjoint folds. 
 """
 function _split_data(n_total::Int64)
     n_half = ceil(Int, n_total/2)
@@ -43,6 +37,16 @@ function _split_data(Zs::AbstractVector)
     Zs[idx_train], Zs[idx_test], idx_train, idx_test
 end
 
+function _split_data(Zs::AbstractVector, sym::Symbol)
+    if sym==:random
+    	_split_dat(Zs)
+	else 
+		throw(DomainError("Only :random implemented."))
+	end
+end
+
+
+
 
 function _default_tuner(Zs_test_discr)
     RMSE(nobs(Zs_test_discr), 0.0)
@@ -52,20 +56,21 @@ end
 # test -> second fold
 Base.@kwdef mutable struct MinimaxCalibratorSetup{DS <: DiscretizedStandardNormalSamples,
                                            IDX,
-                                           ES,
+										   ESTR,
+                                           ESTE,
                                            Gcal <: ConvexPriorClass,
                                            DT <: DeltaTuner,
                                            P,
                                            NB}
-    Zs_train::ES
-    Zs_test::ES
+    Zs_train::ESTR = nothing
+    Zs_test::ESTE
     idx_train::IDX = nothing
     idx_test::IDX = nothing
     prior_class::Gcal
     fkde_train::NB = nothing
     Zs_test_discr::DS
     delta_tuner::DT = _default_tuner(Zs_test_discr)
-    pilot_method::P # = _default_pilot(Zs_test_discr)
+    pilot_method::P = nothing # = _default_pilot(Zs_test_discr)
 end
 
 
@@ -81,100 +86,74 @@ function StatsBase.fit(mceb_setup::MinimaxCalibratorSetup, target::LinearEBayesT
 end
 
 
+Base.@kwdef struct CalibratedMinimaxEstimator{T<:PosteriorTarget,
+	                                          SME<:SteinMinimaxEstimator,
+											  S<:Real}
+	target::T
+	sme::SME
+	pilot::S
+	pilot_num::S
+	pilot_denom::S
+end
+
+function StatsBase.fit(mceb_setup::MinimaxCalibratorSetup, target::PosteriorTarget)
+	@unpack Zs_train, Zs_test_discr, 
+	        prior_class, delta_tuner, pilot_method = mceb_setup
+	
+	num_target = target.num_target 
+	denom_target = MarginalDensityTarget(location(target.num_target)) #	perhaps expose this as MarginalDensityTarget(target)
+
+	num_hat = estimate(numerator_target, pilot_method, Zs_train)
+	denom_hat = estimate(denominator_target, pilot_method, Zs_train)
+	theta_hat = num_hat/denom_hat 
+	
+	
+	calib_target = CalibratedTarget(posterior_target = target, 
+	                                     θ̄ = theta_hat,
+										 denom = denom_hat)									
+	calib_fit = fit(mceb_setup, calib_target)
+	
+	CalibratedMinimaxEstimator(target=target,
+                               sme=calib_fit,
+							   pilot=theta_hat,
+							   pilot_num=num_hat,
+							   pilot_denom=denom_hat)
+	
+end
+
+function target_bias_std(target::PosteriorTarget, 
+	                     calib::CalibratedMinimaxEstimator,
+						 Zs::AbstractVector; kwargs...)
+			
+	calib_target = calib.target					 
+	cres = target_bias_std(calib_target, calib.sme, Zs; kwargs...)
+	
+	ctarget = cres.estimated_target
+	cbias = cres.estimated_bias
+	cstd = cres.estimated_std
+	
+	pilot_denom = calib.pilot_denom 
+	# TODO: sanity check this is the same as target of denominator.
+	pilot = calib.pilot 
+	
+	(estimated_target = pilot + ctarget/pilot_denom,
+	estimated_bias = cbias/pilot_denom,
+	estimated_std = cstd/pilot_denom)
+end
 
 
 
-
-#
-# function CEB_ci(Xs_train, Xs_test,
-#             ds::MixingNormalConvolutionProblem,
-#             target::PosteriorTarget,
-#             M_max_num::EmpiricalBayesEstimator, #
-#             M_max_denom::EmpiricalBayesEstimator=M_max_num;
-#             f_nb::BinnedMarginalDensityNeighborhood = fit(BinnedMarginalDensityNeighborhood, Xs_train, ds),
-#             C=:auto, conf=0.9, kwargs...)
-#
-#
-#     m_train = length(Xs_train)
-#     m_test = length(Xs_test)
-#
-#     marginal_grid = ds.marginal_grid
-#     marginal_h = ds.marginal_h
-#
-#
-#     num_res = estimate(M_max_num, target.num, Xs_train)
-#     denom_res = estimate(M_max_denom, target.denom, Xs_train)
-#
-#     #TODO: Check if denominator not sure to be >0... abort or throw warning
-#     est_target = num_res/denom_res
-#
-#     calib_target = CalibratedNumerator(target.num, est_target)
-#             # Test: Use the Donoho calibrator on the learned function
-#
-#     #TODO : Change to KWarg..
-#
-#     if C==:auto
-#         C = f_nb.C_std*(1+f_nb.η_infl) + f_nb.C_bias
-#     end
-#
-#     ma = MinimaxCalibrator(ds, f_nb.f, m_test, calib_target; C=C, kwargs...)
-#
-#     QXs =  ma.(Xs_test)
-#     sd = std(QXs)/sqrt(m_test)
-#     max_bias = ma.max_bias
-#     zz =  get_plus_minus(max_bias, sd, conf)
-#
-#     zz = zz/denom_res
-#     calib_target = est_target + mean(QXs)/denom_res
-#     ci_left = calib_target - zz
-#     ci_right = calib_target + zz
-#
-#     don_ci = CalibratedCI(num_res,
-#                 M_max_num,
-#                 denom_res,
-#                 M_max_denom,
-#                 est_target,
-#                 calib_target,
-#                 ci_left,
-#                 ci_right,
-#                 sd/denom_res[1],
-#                 max_bias/denom_res[1],
-#                 f_nb,
-#                 ma)
-#
-#     return don_ci
-# end
-#
-# function CEB_ci(Xs_train, Xs_test,
-#             ds::MixingNormalConvolutionProblem,
-#             target::PosteriorTarget;
-#             C=:auto,
-#             conf=0.9,
-#             kwargs...)
-#     # fix this
-#     m_train = length(Xs_train)
-#     m_test = length(Xs_test)
-#
-#     marginal_grid = ds.marginal_grid
-#     marginal_h = ds.marginal_h
-#
-#     M_bd = marginal_h/sqrt(2*pi)
-#
-#     f_const = BinnedMarginalDensity(M_bd, marginal_grid, marginal_h)
-#     # Train
-#     # Estimate the numerator
-#     M_max_num = MinimaxCalibrator(ds, f_const, m_train, target.num;
-#                  C=Inf, kwargs...);
-#
-#
-#     # Estimate the denominator
-#     M_max_denom = MinimaxCalibrator(ds, f_const, m_train, target.denom;
-#                 C=Inf, kwargs...);
-#
-#
-#     CEB_ci(Xs_train, Xs_test, ds, target,
-#                 M_max_num,
-#                 M_max_denom;
-#                 C=C, conf=conf, kwargs...)
-#
-# end
+Base.@kwdef struct MinimaxCalibratorOptions{SPL,
+                                     GCAL <: ConvexPriorClass,
+									 GR <: AbstractVector,
+									 PS,
+									 OPT,
+									 D}
+   split::SPL = :random
+   prior_class::GCAL
+   marginal_grid::GR
+   infinity_band_options::OPT = KDEInfinityBandOptions(a_min = minimum(marginal_grid),
+                                              a_max = maximum(marginal_grid))
+   pilot_options::PS
+   tuner::D = RMSE(5_000, 0.0)
+end

@@ -149,6 +149,11 @@ function (post_target::PosteriorTarget)(prior)
     num/denom
 end
 
+function MarginalDensityTarget(post_target::PosteriorTarget)
+	MarginalDensityTarget(location(post_target.num_target))
+end 
+
+
 function extrema(target::PosteriorTarget{LF} where LF<:LFSRNumerator)
 	(0.0,1.0)
 end
@@ -165,10 +170,26 @@ end
 #------------------ Calibration---------------------------------
 
 #---------Should probably just turn this all into one function-----
-struct CalibratedTarget{T <: PosteriorTarget, S<:Real} <: LinearEBayesTarget
-    post::PosteriorTarget
+
+Base.@kwdef struct CalibratedTarget{T <: PosteriorTarget, S<:Real} <: LinearEBayesTarget
+    posterior_target::T
     θ̄::S #Pilot
+	denom::S #denominator pilot 
 end
+
+function MarginalDensityTarget(calib_target::CalibratedTarget)
+	MarginalDensityTarget(calib_target.posterior_target)
+end 
+
+
+# special semantics here.
+function (calib_target::CalibratedTarget)(prior)
+    numerator_target = calib_target.posterior_target.num_target
+    denominator_target = MarginalDensityTarget(calib_target)
+	θ̄ = calib_target.θ̄
+    numerator_target(prior) - θ̄*denominator_target(prior)
+end
+
 
 #function (target::CalibratedTarget)(prior)
 #	target.post.num_target(prior) -

@@ -398,7 +398,7 @@ function SteinMinimaxEstimator(Z::DiscretizedStandardNormalSamples,
     max_bias = (ω_δ - δ*ω_δ_prime)/2
     unit_var_proxy = ω_δ_prime^2
 
-    n = length(Z)
+    n = nobs(Z)
     SteinMinimaxEstimator(Z=Z,
                           prior_class=prior_class,
                           target=target,
@@ -418,26 +418,44 @@ end
 
 
 
-#function target_bias_std(target::EBayesTarget,
-#	                     fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;
-#	                     bias_corrected=true,
-#						 clip=true)
-#(estimated_target = target_value,
-# estimated_bias = target_bias,
- #estimated_std = sqrt(target_variance))
-#end
+target_bias_std(target::EBayesTarget, model, Zs; kwargs...) = target_bias_std(target, model; kwargs...)
+confint(target::EBayesTarget, model, Zs; kwargs...) = confint(target, model; kwargs...)
 
-#function Distributions.estimate(target::EBayesTarget, fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel; kwargs...)
-#target_bias_std(target, fcef; kwargs...)[:estimated_target]
-#end
+function target_bias_std(target::EBayesTarget, 
+	                     sme::SteinMinimaxEstimator,
+						 Zs::AbstractVector)
+	Qs = sme.(response(Zs)) # assume Gaussian samples?					
+	estimated_target = mean(Qs)
+	estimated_std = std(Qs)./length(Zs)
+	estimated_bias = worst_case_bias(sme)
+	(estimated_target = estimated_target,
+	 estimated_bias = estimated_bias,
+	 estimated_std = estimated_std)
+end 
 
-#function StatsBase.confint(target::EBayesTarget,
- #                      fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;
- #                      level::Real = 0.9,
-  #                     worst_case_bias_adjusted = true,
-  #                     clip = true)
+function (sme::SteinMinimaxEstimator)(x)
+	sme.Q(x)
+end
 
-  #                     L,U
+function Distributions.estimate(target::EBayesTarget, fitted_model, Zs; kwargs...)
+	target_bias_std(target, fitted_model, Zs; kwargs...)[:estimated_target]
+end
+#		
+#	end
+
+
+function StatsBase.confint(target::EBayesTarget,
+	                       sme, #SteinMinimaxEstimator #default fallback
+                           Zs::AbstractVector; 
+						   level = 0.9,
+						   clip = true)
+	res = target_bias_std(target, sme, Zs)
+	maxbias = abs(res[:estimated_bias])
+	q_mult = bias_adjusted_gaussian_ci(res[:estimated_std], maxbias=maxbias , level=level)
+    L,U = res[:estimated_target] .+ (-1,1).*q_mult
+	L, U = clip ? clamp.((L,U), extrema(target)... ) : (L,U)
+    L,U
+end
 
 @userplot SteinMinimaxPlot
 

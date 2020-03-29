@@ -1,6 +1,10 @@
 # algorithm type
 struct ButuceaComte end
 
+Base.@kwdef struct ButuceaComteOptions{S}
+    bandwidth::S = :automatic
+end 
+
 struct ButuceaComteEstimator{EBT<:LinearEBayesTarget}
     target::EBT
     h::Float64

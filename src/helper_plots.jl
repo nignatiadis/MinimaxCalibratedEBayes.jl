@@ -1,3 +1,11 @@
+function density_bands_to_ribbons(ys, bands)
+    lower_lims = ys .- max.(ys .- bands, 0)
+    upper_lims = copy(lower_lims)
+    upper_lims .= c
+    (lower_lims, upper_lims)
+end
+
+
 @userplot ConfIntPlot
 
 
