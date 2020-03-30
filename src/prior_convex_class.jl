@@ -90,7 +90,8 @@ function worst_case_bias(Q::DiscretizedAffineEstimator,
     end
 
     if (!isnothing(Z.f_min))
-        @constraint(model, f1_lower, fs .>= Z.f_min[idx_nonzero])
+        idx_nonzero = idx_enforce_lower_bound(gmix_class, Z) #
+        @constraint(model, f1_lower, fs[idx_nonzero] .>= Z.f_min[idx_nonzero])
     end
 
     if boundary_mass < Inf
@@ -284,11 +285,13 @@ struct HalfCIWidth <: BiasVarAggregate
     δ_min::Float64
 end
 
+
+
 #default_δ_min(n) =
 #default_δ_min(n) =
 
 #end
-#HalfCIWidth(n) = HalfCIWidth(n, 0.9, )
+HalfCIWidth(n::Integer, δ_min::Float64) = HalfCIWidth(n, 0.9, δ_min)
 
 function (half_ci::HalfCIWidth)(bias, unit_var_proxy)
     se = sqrt(unit_var_proxy/half_ci.n)
@@ -300,7 +303,7 @@ function optimal_δ(model::JuMP.Model, objective::BiasVarAggregate)
     f = δ -> objective(modulus_at_δ!(model, δ))
     δ_max = model[:δ_max]
     δ_min = objective.δ_min
-    Optim.optimize(f, δ_min, δ_max).minimizer
+    Optim.optimize(f, δ_min, δ_max; rel_tol=1e-3).minimizer
 end
 
 
@@ -388,10 +391,10 @@ function SteinMinimaxEstimator(Z::DiscretizedStandardNormalSamples,
     f1 = marginalize(g1, Z)
     f2 = marginalize(g2, Z)
 
-    f̄s_sqrt = model[:f̄s_sqrt]
+    f̄s = Z.var_proxy
     Q = ω_δ_prime/δ*(pdf(f2) .- pdf(f1))./Z.var_proxy
     Q_0  = (L1+L2)/2 -
-           ω_δ_prime/(2*δ)*sum( (pdf(f2) .- pdf(f1)).* (pdf(f2) .+ pdf(f1)) ./ f̄s_sqrt)
+           ω_δ_prime/(2*δ)*sum( (pdf(f2) .- pdf(f1)).* (pdf(f2) .+ pdf(f1)) ./ f̄s)
 
     stein = DiscretizedAffineEstimator(Z, Q, Q_0)
 
