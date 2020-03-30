@@ -186,7 +186,6 @@ function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
                           fkde::MinimaxCalibratedEBayes.KDEInfinityBand)
     
     @unpack n_interp, η_infl = fkde 
-    @show     n_interp,   η_infl            
     grid = Zs_discr.mhist.grid
     fkde_interp = fkde.interp_kde.itp
     n = nobs(Zs_discr)
@@ -202,9 +201,9 @@ function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
         x_right = grid[i]
         h = x_right - x_left  # step(grid)...
         interp_res = fkde_interp(range(x_left, x_right, length=n_interp))
-        f_max[i] = maximum(interp_res)*h + C∞
-        f_min[i] = max( minimum(interp_res)*h - C∞, 0.0)
-        var_proxy[i] = max(maximum(interp_res)*h, C∞)
+        f_max[i] = maximum(interp_res)*h + C∞*h
+        f_min[i] = max( minimum(interp_res)*h - C∞*h, 0.0)
+        var_proxy[i] = max(maximum(interp_res)*h, C∞*h)
     end
 
     #fill in first and last element
