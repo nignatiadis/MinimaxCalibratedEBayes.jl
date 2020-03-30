@@ -82,13 +82,28 @@ function (target::PriorDensityTarget)(prior::MixtureModel)
 	pdf(prior, location(target))
 end
 
-
 function extrema(target::PriorDensityTarget)
 	(0, Inf)
 end
-#abstract type PosteriorNumeratorTarget <: LinearInferenceTarget end
 
 
+
+#--- OneSidedPriorTailProbability
+Base.@kwdef struct OneSidedPriorTailProbability <: LinearEBayesTarget
+    cutoff::Float64 = 0.0
+end
+
+function extrema(target::OneSidedPriorTailProbability)
+	(0, 1)
+end
+
+function riesz_representer(target::OneSidedPriorTailProbability, t)
+    one(Float64)*(t >= target.cutoff)
+end
+
+function (target::OneSidedPriorTailProbability)(prior)
+	ccdf(prior, target.cutoff)
+end
 
 
 #function integration_domain(t::LinearInferenceTarget)
@@ -190,6 +205,13 @@ function (calib_target::CalibratedTarget)(prior)
     numerator_target(prior) - θ̄*denominator_target(prior)
 end
 
+# hardcoding
+function (calib_target::CalibratedTarget)(prior::MixtureModel)
+    numerator_target = calib_target.posterior_target.num_target
+    denominator_target = MarginalDensityTarget(calib_target)
+	θ̄ = calib_target.θ̄
+    numerator_target(prior) - θ̄*denominator_target(prior)
+end
 
 #function (target::CalibratedTarget)(prior)
 #	target.post.num_target(prior) -

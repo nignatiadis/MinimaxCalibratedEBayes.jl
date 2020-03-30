@@ -5,6 +5,11 @@ function density_bands_to_ribbons(ys, bands)
     (lower_lims, upper_lims)
 end
 
+function density_bands_to_ribbons(ys, bands::AbstractVector{<:Tuple})
+    bands_left = first.(bands)
+    bands_right = last.(bands)
+    (bands_left, bands_right)
+end 
 
 @userplot ConfIntPlot
 
