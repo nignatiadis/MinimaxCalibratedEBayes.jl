@@ -286,11 +286,6 @@ struct HalfCIWidth <: BiasVarAggregate
 end
 
 
-
-#default_δ_min(n) =
-#default_δ_min(n) =
-
-#end
 HalfCIWidth(n::Integer, δ_min::Float64) = HalfCIWidth(n, 0.9, δ_min)
 
 function (half_ci::HalfCIWidth)(bias, unit_var_proxy)
@@ -426,10 +421,16 @@ confint(target::EBayesTarget, model, Zs; kwargs...) = confint(target, model; kwa
 
 function target_bias_std(target::EBayesTarget, 
 	                     sme::SteinMinimaxEstimator,
-						 Zs::AbstractVector)
+						 Zs::AbstractVector;
+                         std_type = :empirical)
 	Qs = sme.(response(Zs)) # assume Gaussian samples?					
 	estimated_target = mean(Qs)
-	estimated_std = std(Qs)./length(Zs)
+    if std_type == :empirical
+	    estimated_std = std(Qs)/sqrt(length(Zs))
+    elseif std_type == :var_proxy
+        estimated_std = sqrt(sme.unit_var_proxy / length(Zs))
+    end
+         
 	estimated_bias = worst_case_bias(sme)
 	(estimated_target = estimated_target,
 	 estimated_bias = estimated_bias,
@@ -451,8 +452,9 @@ function StatsBase.confint(target::EBayesTarget,
 	                       sme, #SteinMinimaxEstimator #default fallback
                            Zs::AbstractVector; 
 						   level = 0.9,
-						   clip = true)
-	res = target_bias_std(target, sme, Zs)
+						   clip = true,
+                           kwargs...)
+	res = target_bias_std(target, sme, Zs; kwargs...)
 	maxbias = abs(res[:estimated_bias])
 	q_mult = bias_adjusted_gaussian_ci(res[:estimated_std], maxbias=maxbias , level=level)
     L,U = res[:estimated_target] .+ (-1,1).*q_mult
