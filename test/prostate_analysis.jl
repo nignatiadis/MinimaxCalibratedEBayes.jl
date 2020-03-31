@@ -64,9 +64,9 @@ fkde_train = fit(infinity_band_options, response.(Zs_train))
 
 # Let us visualize the result by showing a histogram of the datapoints
 # the estimated density function and the $L_\infty$ bands.
-histogram(response.(Zs_train), bins=50, normalize=true,
-          label="", alpha=0.4)
-plot!(fkde_train, label="Kernel estimate",
+prostate_marginal_plot = histogram(response.(Zs_train), bins=50, normalize=true,
+          label="", alpha=0.6, fillcolor=:lightgray)
+plot!(fkde_train, label="Kernel estimate \n  (and bands)",
       legend=:topright)
 
 
@@ -106,9 +106,10 @@ mceb_setup = MinimaxCalibratorSetup(Zs_train = Zs_train,
 post_means_fits = fit.(mceb_setup, post_means)
 lfsrs_fits = fit.(mceb_setup, lfsrs)
 
-prostate_postmeans_plot = plot(post_means_fits, ylims=(-2.5,2.5));
-prostate_lfsr_plot = plot(lfsrs_fits, label=nothing);
-plot(prostate_lfsr_plot, prostate_postmeans_plot)
+gr()
+prostate_postmeans_plot = plot(post_means_fits, ylims=(-2.5,2.5))
+prostate_lfsr_plot = plot(lfsrs_fits, label=nothing)
+plot(prostate_lfsr_plot, prostate_postmeans_plot, layout=(1,2))
 
 
 # # The impact of Neighborhoods: Moving to opportunity
@@ -142,21 +143,41 @@ nbhood_mceb_setup = fit(mceb_options, nbhood_Zs)
 
 extrema(response.(nbhood_mceb_setup.Zs_train)),extrema(response.(nbhood_mceb_setup.Zs_test))
 
-
+GR.settextfontprec(232, 3)
+gr()
 nbhood_post_means_fits = fit.(nbhood_mceb_setup, post_means)
 nbhood_lfsrs_fits = fit.(nbhood_mceb_setup, lfsrs)
 
-prostate_postmeans_plot = plot(post_means_fits, ylims=(-2.5,2.5))
+prostate_postmeans_plot = plot(post_means_fits, ylims=(-3.2,3.2), 
+                            fg_legend=:transparent, bg_legend=:transparent,
+							legend = (0.35,0.84))
 prostate_lfsrs_plot = plot(lfsrs_fits, label=nothing)
 
-nbhood_postmeans_plot = plot(nbhood_post_means_fits,  ylims=(-2.5,2.5), label=nothing)
-nbhood_lfsrs_plot = plot(nbhood_lfsrs_fits, label=nothing)
+nbhood_postmeans_plot = plot(nbhood_post_means_fits,  ylims=(-3.2,3.2), label=nothing)
+nbhood_lfsrs_plot = plot(nbhood_lfsrs_fits,  label=nothing)
 
-dataset_plot = plot(prostate_postmeans_plot, nbhood_postmeans_plot, 
-	 prostate_lfsrs_plot, nbhood_lfsrs_plot, 
-	 title = ["a)" "b)" "c" "d"],
-	 layout= (2,2), size=(500,300))
+
+prostate_marginal_plot = histogram(response.(Zs_train), bins=20, normalize=true,
+          label="", alpha=0.4, fillcolor=:lightgray)
+plot!(prostate_marginal_plot, fkde_train, fillalpha=0.45, #L"\bar{f}(x)\pm c_m",
+      linewidth=1, label=nothing, #L"\bar{f}(x)\pm c_m",
+	  legend=:topleft,  bg_legend=:transparent, 
+	  fg_legend=:transparent)
+	  
+nbhood_marginal_plot = histogram(response.(nbhood_mceb_setup.Zs_train), bins=20, normalize=true,
+	            label=nothing, alpha=0.4, fillcolor=:lightgray)
+plot!(nbhood_marginal_plot, nbhood_mceb_setup.fkde_train, fillalpha=0.45, 
+                  label=nothing, linewidth=1)
+	  	  	  
+plot()
+using Plots.Measures
+dataset_plot = plot(prostate_marginal_plot, prostate_postmeans_plot, prostate_lfsrs_plot,
+	 nbhood_marginal_plot, nbhood_postmeans_plot, nbhood_lfsrs_plot, 
+	 title = ["a) Prostate" "b)" "c)" " d) Neighborhoods" "e)" "f)"],
+	 layout= (2,3), size=(750,500))
 dataset_plot
 
+savefig(dataset_plot, "dataset_plots.pdf")
 #savefig(dataset_plot, "mceb_datasets.pdf")
-	 
+	
+	
