@@ -217,7 +217,7 @@ function fit(mceb_opt::MinimaxCalibratorOptions, Zs::AbstractVector{<:StandardNo
 	                                    Zs_test = Zs_test,
 										idx_train = idx_train,
 										idx_test = idx_test,
-							            prior_class = gcal,
+							            prior_class = prior_class,
 							            fkde_train = fkde_train,
 							            Zs_test_discr = Zs_test_discr,
 							            pilot_method = pilot_fit,

@@ -64,18 +64,19 @@ end
 		seriestype  -->  :path
 		color --> "#550133"
 		linestyle --> :dot
-		label --> L"Pilot estimator $\bar{\theta}(x)$"
+		label -->  L"\bar{\theta}(x)"#" #L"Pilot estimator $\bar{\theta}(x)$"
 		target_grid, pilots
 	end 
 	
 	color --> "#018AC4"
 	fillalpha --> 0.39
 	ribbon --> cis_ribbon	
-	xlabel --> L"x"
-	ylabel --> pretty_label(targets[1])
+	xguide --> L"x"
+	
+	yguide --> pretty_label(targets[1])
 	ylims --> extrema(targets[1])
 	legend --> :topleft
-	label --> L"Calibrated estimator $\bar{\theta}(x) + \hat{\Delta}(x)$"
+	label --> L"\bar{\theta}(x) + \hat{\Delta}(x)" #L"Calibrated estimator $\bar{\theta}(x) + \hat{\Delta}(x)$"
 
 	target_grid, calib_estimates
 end 

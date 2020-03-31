@@ -427,9 +427,11 @@ function target_bias_std(target::EBayesTarget,
     #@show length(Qs)				
 	estimated_target = mean(Qs)
     if std_type == :empirical
-	    estimated_std = std(Qs)/nobs(Zs)
+	    estimated_std = std(Qs)/sqrt(nobs(Zs))
     elseif std_type == :var_proxy
         estimated_std = sqrt(sme.unit_var_proxy / nobs(Zs))
+    else
+        error("only :empirical and :var_proxy sdt_type defined")
     end
          
 	estimated_bias = worst_case_bias(sme)
