@@ -100,6 +100,7 @@ function support(Z_discr::DiscretizedStandardNormalSamples)
     supp
 end
 
+# TODO: needs some work...
 function set_neighborhood(Zs::DiscretizedStandardNormalSamples,
                           prior::Distribution;
                           C∞_density = Inf,
@@ -127,6 +128,11 @@ end
 function (Zs_disc::DiscretizedStandardNormalSamples)(i::Int)
     DiscretizedStandardNormalSample(Zs_disc, i)
 end
+
+
+# FIXME: this will have to go once implement iterator protocol for
+# DiscretizedStandardNormalSample
+broadcastable(Zs::DiscretizedStandardNormalSamples) = Ref(Zs)
 
 # convert to discretenonparametric dbn
 function DiscreteNonParametric(Zs_discr::DiscretizedStandardNormalSamples)
@@ -164,7 +170,19 @@ function (calib::DiscretizedAffineEstimator)(x)
     calib.Q[idxs] + calib.Qo
 end
 
+function (Q::DiscretizedAffineEstimator)(Zs::DiscretizedStandardNormalSamples)
+	# TODO: what if idx is nothing?
+	Q.Q[Zs.idx] .+ Q.Qo 
+end
 
+function (Q::DiscretizedAffineEstimator)(x::StandardNormalSample)
+    Q(response(x))
+end
+
+#  function (calib::DiscretizedAffineEstimator)(x)
+#    idxs = StatsBase.binindex(calib.mhist, x)
+#   calib.Q[idxs] + calib.Qo
+#end
 
 function _get_plot_x(mhist::MCEBHistogram)
     x = midpoints(mhist.grid)

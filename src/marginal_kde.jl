@@ -150,12 +150,6 @@ end
 # plotting of infinite band
 
 
-function _get_density_bands(ys, c)
-    lower_lims = ys .- max.(ys .- c, 0)
-    upper_lims = copy(lower_lims)
-    upper_lims .= c
-    (lower_lims, upper_lims)
-end
 
 
 @recipe function f(ctband::KDEInfinityBand;
@@ -172,7 +166,7 @@ end
     infty_bound = ctband.C∞ * ctband.η_infl
     
     if show_bands
-        _ys_lower, _ys_upper = _get_density_bands(y, infty_bound)
+        _ys_lower, _ys_upper = density_bands_to_ribbons(y, infty_bound)
         ribbons --> (_ys_lower, _ys_lower)
         fillalpha --> 0.2
     end

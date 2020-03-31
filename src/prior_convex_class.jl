@@ -421,14 +421,15 @@ confint(target::EBayesTarget, model, Zs; kwargs...) = confint(target, model; kwa
 
 function target_bias_std(target::EBayesTarget, 
 	                     sme::SteinMinimaxEstimator,
-						 Zs::AbstractVector;
+						 Zs=sme.Z;
                          std_type = :empirical)
-	Qs = sme.(response(Zs)) # assume Gaussian samples?					
+	Qs = sme.(Zs) # assume Gaussian samples?	
+    #@show length(Qs)				
 	estimated_target = mean(Qs)
     if std_type == :empirical
-	    estimated_std = std(Qs)/sqrt(length(Zs))
+	    estimated_std = std(Qs)/nobs(Zs)
     elseif std_type == :var_proxy
-        estimated_std = sqrt(sme.unit_var_proxy / length(Zs))
+        estimated_std = sqrt(sme.unit_var_proxy / nobs(Zs))
     end
          
 	estimated_bias = worst_case_bias(sme)
@@ -441,8 +442,8 @@ function (sme::SteinMinimaxEstimator)(x)
 	sme.Q(x)
 end
 
-function Distributions.estimate(target::EBayesTarget, fitted_model, Zs; kwargs...)
-	target_bias_std(target, fitted_model, Zs; kwargs...)[:estimated_target]
+function Distributions.estimate(target::EBayesTarget, fitted_model, args...; kwargs...)
+	target_bias_std(target, fitted_model, args...; kwargs...)[:estimated_target]
 end
 #		
 #	end
@@ -450,11 +451,11 @@ end
 
 function StatsBase.confint(target::EBayesTarget,
 	                       sme, #SteinMinimaxEstimator #default fallback
-                           Zs::AbstractVector; 
+                           args...; 
 						   level = 0.9,
 						   clip = true,
                            kwargs...)
-	res = target_bias_std(target, sme, Zs; kwargs...)
+	res = target_bias_std(target, sme, args...; kwargs...)
 	maxbias = abs(res[:estimated_bias])
 	q_mult = bias_adjusted_gaussian_ci(res[:estimated_std], maxbias=maxbias , level=level)
     L,U = res[:estimated_target] .+ (-1,1).*q_mult

@@ -60,7 +60,6 @@ import Base.Broadcast: broadcastable
 
 include("bias_adjusted_ci.jl")
 include("marginal_binning.jl")
-include("helper_plots.jl")
 include("inference_targets.jl")
 include("normal_rules.jl")
 include("marginal_kde.jl")
@@ -72,6 +71,7 @@ include("npmle.jl")
 include("hermite.jl")
 include("main_mceb.jl")
 include("load_datasets.jl")
+include("helper_plots.jl")
 
 
 export MCEBHistogram,

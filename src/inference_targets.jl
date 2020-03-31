@@ -174,11 +174,11 @@ function extrema(target::PosteriorTarget{LF} where LF<:LFSRNumerator)
 end
 
 function pretty_label(target::PosteriorTarget{LF} where LF<:LFSRNumerator)
-	L"\theta(x) = \Pr[\mu \geq 0 \mid X=x]"
+	L"\theta(x) := \Pr[\mu \geq 0 \mid X=x]"
 end
 
 function pretty_label(target::PosteriorTarget{PM} where PM<:PosteriorMeanNumerator)
-	L"\theta(x) = E[\mu | X=x]"
+	L"\theta(x) := E[\mu | X=x]"
 end
 
 

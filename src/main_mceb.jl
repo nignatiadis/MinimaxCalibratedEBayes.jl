@@ -39,7 +39,7 @@ end
 
 function _split_data(Zs::AbstractVector, sym::Symbol)
     if sym==:random
-    	_split_dat(Zs)
+    	_split_data(Zs)
 	else 
 		throw(DomainError("Only :random implemented."))
 	end
@@ -47,14 +47,29 @@ end
 
 
 
+function _default_tuner(delta_tuner::DeltaTuner, Zs_test_discr, fkde_train)
+	delta_tuner
+end 
 
-function _default_tuner(Zs_test_discr)
-    RMSE(nobs(Zs_test_discr), 0.0)
+function _default_tuner(delta_tuner::Type{<:DeltaTuner}, Zs_test_discr, fkde_train::KDEInfinityBand)
+	n = nobs(Zs_test_discr)
+	δ_min = default_δ_min(n, fkde_train.C∞)
+	delta_tuner(n, δ_min)
+end 
+
+function _default_tuner(delta_tuner::Type{<:DeltaTuner}, Zs_test_discr, ::Nothing)
+	n = nobs(Zs_test_discr)
+	δ_min = 0.0
+	delta_tuner(n, δ_min)
+end 
+
+function _default_tuner(Zs_test_discr, fkde_train)
+	_default_tuner(RMSE, Zs_test_discr, fkde_train)
 end
 
 # train => first fold
 # test -> second fold
-Base.@kwdef mutable struct MinimaxCalibratorSetup{DS <: DiscretizedStandardNormalSamples,
+mutable struct MinimaxCalibratorSetup{DS <: DiscretizedStandardNormalSamples,
                                            IDX,
 										   ESTR,
                                            ESTE,
@@ -62,16 +77,40 @@ Base.@kwdef mutable struct MinimaxCalibratorSetup{DS <: DiscretizedStandardNorma
                                            DT <: DeltaTuner,
                                            P,
                                            NB}
-    Zs_train::ESTR = nothing
+    Zs_train::ESTR
     Zs_test::ESTE
-    idx_train::IDX = nothing
-    idx_test::IDX = nothing
+    idx_train::IDX 
+    idx_test::IDX 
     prior_class::Gcal
-    fkde_train::NB = nothing
+    fkde_train::NB 
     Zs_test_discr::DS
-    delta_tuner::DT = _default_tuner(Zs_test_discr)
-    pilot_method::P = nothing # = _default_pilot(Zs_test_discr)
+    delta_tuner::DT 
+    pilot_method::P 
 end
+
+function MinimaxCalibratorSetup(;Zs_test, 
+	                             prior_class,
+								 Zs_test_discr,
+								 delta_tuner = _default_tuner(Zs_test_discr, fkde_train),
+								 Zs_train = nothing,
+								 idx_train = nothing,
+								 idx_test = nothing,
+								 fkde_train = nothing,
+								 pilot_method = nothing) #default_pilot?
+
+
+	delta_tuner = _default_tuner(delta_tuner, Zs_test_discr, fkde_train)
+								 
+	MinimaxCalibratorSetup(Zs_train, Zs_test, idx_train, idx_test, 
+	                       prior_class, fkde_train, Zs_test_discr,
+						   delta_tuner, pilot_method)
+
+end
+
+#update_delta_tuner()
+
+broadcastable(setup::MinimaxCalibratorSetup) = Ref(setup)
+
 
 
 function StatsBase.fit(mceb_setup::MinimaxCalibratorSetup, target::LinearEBayesTarget)
@@ -100,8 +139,8 @@ function StatsBase.fit(mceb_setup::MinimaxCalibratorSetup, target::PosteriorTarg
 	@unpack Zs_train, Zs_test_discr, 
 	        prior_class, delta_tuner, pilot_method = mceb_setup
 	
-	num_target = target.num_target 
-	denom_target = MarginalDensityTarget(location(target.num_target)) #	perhaps expose this as MarginalDensityTarget(target)
+	numerator_target = target.num_target 
+	denominator_target = MarginalDensityTarget(location(target.num_target)) #	perhaps expose this as MarginalDensityTarget(target)
 
 	num_hat = estimate(numerator_target, pilot_method, Zs_train)
 	denom_hat = estimate(denominator_target, pilot_method, Zs_train)
@@ -123,9 +162,9 @@ end
 
 function target_bias_std(target::PosteriorTarget, 
 	                     calib::CalibratedMinimaxEstimator,
-						 Zs::AbstractVector; kwargs...)
+						 Zs=calib.sme.Z; kwargs...)
 			
-	calib_target = calib.target					 
+	calib_target = calib.target		
 	cres = target_bias_std(calib_target, calib.sme, Zs; kwargs...)
 	
 	ctarget = cres.estimated_target
@@ -155,5 +194,32 @@ Base.@kwdef struct MinimaxCalibratorOptions{SPL,
    infinity_band_options::OPT = KDEInfinityBandOptions(a_min = minimum(marginal_grid),
                                               a_max = maximum(marginal_grid))
    pilot_options::PS
-   tuner::D = RMSE(5_000, 0.0)
+   tuner::D = HalfCIWidth
+end
+
+
+function fit(mceb_opt::MinimaxCalibratorOptions, Zs::AbstractVector{<:StandardNormalSample})
+	@unpack split, prior_class, marginal_grid,
+	        infinity_band_options, pilot_options, tuner = mceb_opt
+	Zs_train, Zs_test, idx_train, idx_test = _split_data(Zs, split)
+	
+	a_min, a_max = extrema(marginal_grid)
+	infinity_band_options = KDEInfinityBandOptions(a_min=a_min, a_max=a_max)
+	# TODO: let fkde_train be better at getting dispatched
+	fkde_train = fit(infinity_band_options, response.(Zs_train))
+
+	pilot_fit = fit(pilot_options, Zs_train)
+
+	Zs_test_discr = DiscretizedStandardNormalSamples(Zs_test, marginal_grid)
+	Zs_test_discr = set_neighborhood(Zs_test_discr, fkde_train)
+
+	mceb_setup = MinimaxCalibratorSetup(Zs_train = Zs_train,
+	                                    Zs_test = Zs_test,
+										idx_train = idx_train,
+										idx_test = idx_test,
+							            prior_class = gcal,
+							            fkde_train = fkde_train,
+							            Zs_test_discr = Zs_test_discr,
+							            pilot_method = pilot_fit,
+										delta_tuner = tuner)
 end
