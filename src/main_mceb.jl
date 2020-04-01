@@ -85,7 +85,10 @@ mutable struct MinimaxCalibratorSetup{DS <: DiscretizedStandardNormalSamples,
     fkde_train::NB 
     Zs_test_discr::DS
     delta_tuner::DT 
-    pilot_method::P 
+    pilot_method::P
+	cache_target::Bool
+	previous_target
+	delta_cached::Float64
 end
 
 function MinimaxCalibratorSetup(;Zs_test, 
@@ -96,14 +99,18 @@ function MinimaxCalibratorSetup(;Zs_test,
 								 idx_train = nothing,
 								 idx_test = nothing,
 								 fkde_train = nothing,
-								 pilot_method = nothing) #default_pilot?
+								 pilot_method = nothing,
+								 cache_target = false,
+								 previous_target = nothing,
+								 delta_cached = NaN) #default_pilot?
 
 
 	delta_tuner = _default_tuner(delta_tuner, Zs_test_discr, fkde_train)
 								 
 	MinimaxCalibratorSetup(Zs_train, Zs_test, idx_train, idx_test, 
 	                       prior_class, fkde_train, Zs_test_discr,
-						   delta_tuner, pilot_method)
+						   delta_tuner, pilot_method,
+						   cache_target, previous_target, delta_cached)
 
 end
 
@@ -135,9 +142,21 @@ Base.@kwdef struct CalibratedMinimaxEstimator{T<:PosteriorTarget,
 	pilot_denom::S
 end
 
+function _update_setup(mceb_setup::MinimaxCalibratorSetup, target::EBayesTarget)
+	@unpack cache_target, previous_target, delta_cached = mceb_setup
+	
+	if (cache_target) && (typeof(previous_target) == typeof(target))
+		updated_setup = @set mceb_setup.delta_tuner = FixedDelta(delta_cached)
+	else 
+		updated_setup = mceb_setup
+	end
+	updated_setup
+end
+
 function StatsBase.fit(mceb_setup::MinimaxCalibratorSetup, target::PosteriorTarget)
 	@unpack Zs_train, Zs_test_discr, 
-	        prior_class, delta_tuner, pilot_method = mceb_setup
+	        prior_class, delta_tuner, pilot_method,
+			cache_target = mceb_setup
 	
 	numerator_target = target.num_target 
 	denominator_target = MarginalDensityTarget(location(target.num_target)) #	perhaps expose this as MarginalDensityTarget(target)
@@ -148,9 +167,16 @@ function StatsBase.fit(mceb_setup::MinimaxCalibratorSetup, target::PosteriorTarg
 	
 	
 	calib_target = CalibratedTarget(posterior_target = target, 
-	                                     θ̄ = theta_hat,
-										 denom = denom_hat)									
-	calib_fit = fit(mceb_setup, calib_target)
+	                                θ̄ = theta_hat,
+									denom = denom_hat)
+									
+	tmp_setup = _update_setup(mceb_setup, target)
+    calib_fit = fit(tmp_setup, calib_target)
+	
+	if cache_target
+		mceb_setup.delta_cached = calib_fit.δ
+		mceb_setup.previous_target = target
+	end
 	
 	CalibratedMinimaxEstimator(target=target,
                                sme=calib_fit,
@@ -195,12 +221,13 @@ Base.@kwdef struct MinimaxCalibratorOptions{SPL,
                                               a_max = maximum(marginal_grid))
    pilot_options::PS
    tuner::D = HalfCIWidth
+   cache_target::Bool = false
 end
 
 
 function fit(mceb_opt::MinimaxCalibratorOptions, Zs::AbstractVector{<:StandardNormalSample})
 	@unpack split, prior_class, marginal_grid,
-	        infinity_band_options, pilot_options, tuner = mceb_opt
+	        infinity_band_options, pilot_options, tuner, cache_target = mceb_opt
 	Zs_train, Zs_test, idx_train, idx_test = _split_data(Zs, split)
 	
 	a_min, a_max = extrema(marginal_grid)
@@ -221,5 +248,6 @@ function fit(mceb_opt::MinimaxCalibratorOptions, Zs::AbstractVector{<:StandardNo
 							            fkde_train = fkde_train,
 							            Zs_test_discr = Zs_test_discr,
 							            pilot_method = pilot_fit,
-										delta_tuner = tuner)
+										delta_tuner = tuner,
+										cache_target= cache_target)
 end
