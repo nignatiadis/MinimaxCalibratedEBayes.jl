@@ -171,7 +171,7 @@ end
         fillalpha --> 0.2
     end
 
-    xlab --> "x"
+    xguide --> L"x"
     x,y
 end
 

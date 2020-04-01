@@ -119,12 +119,12 @@ struct LFSRNumerator{NS <: StandardNormalSample} <: LinearEBayesTarget
 end
 
 function cf(target::LFSRNumerator{<:StandardNormalSample}, t)
-    x =
+    x = response(target)
     exp(im*t*x- t^2/2)*(1+im*erfi((t-im*x)/sqrt(2)))/2
 end
 
 function riesz_representer(target::LFSRNumerator{<:StandardNormalSample}, t)
-    x = response(location(target))
+    x = response(target)
     pdf(Normal(), x - t)*(t>=0)
 end
 

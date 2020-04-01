@@ -1,4 +1,4 @@
-const _hermite = Hermite()
+const _hermite = OrthogonalPolynomialsQuasi.Hermite()
 # perhaps call fastGaussQuadrature directly
 const DEFAULT_HERMITE_INTEGRATOR = sqrt(2π)*expectation(Normal(); n=100)
 const DEFAULT_SQUARED_HERMITE_INTEGRATOR = sqrt(π)*expectation(Normal(0, 1/sqrt(2)); n=101)

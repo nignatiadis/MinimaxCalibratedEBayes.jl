@@ -6,6 +6,7 @@ using Reexport
                 Distributions,
                 EBayes
 
+using ApproxFun:Interval, Fun
 using DiffResults
 using Expectations
 using ExponentialFamilies
@@ -17,11 +18,13 @@ using LinearAlgebra
 using MathOptInterface
 using Optim
 using OrthogonalPolynomialsQuasi
+using OscillatoryIntegrals
 using Parameters
 using Plots
 using RecipesBase
 using Roots
 using Setfield
+using SpecialFunctions:erfi
 using QuadGK
 
 import StatsBase:confint,

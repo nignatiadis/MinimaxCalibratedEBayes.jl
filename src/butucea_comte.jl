@@ -2,12 +2,17 @@
 struct ButuceaComte end
 
 Base.@kwdef struct ButuceaComteOptions{S}
-    bandwidth::S = :automatic
-end 
+    bandwidth::S = :auto
+end
+
+fit(bcopt::ButuceaComteOptions, Zs) = bcopt #do nothing
+
 
 struct ButuceaComteEstimator{EBT<:LinearEBayesTarget}
     target::EBT
     h::Float64
+    f_real #ApproxFun based 
+    f_imag #ApproxFun based
 end
 
 # Make theoretical results of BC practical.
@@ -66,17 +71,19 @@ end
 
 
 
-function default_bandwidth(::ButuceaComte,
+function default_bandwidth(::Type{ButuceaComteEstimator},
                            target::MarginalDensityTarget{<:StandardNormalSample},
                            n)
     sqrt(log(n))
 end
 
+default_bandwidth(::Type{ButuceaComteEstimator}, target::LFSRNumerator, n) = sqrt(log(n)*2/3)
+
+default_bandwidth(::Type{ButuceaComteEstimator}, target::PosteriorMeanNumerator, n) = sqrt(log(n))
 
 
 
-
-function default_bandwidth(::ButuceaComte,
+function default_bandwidth(::Type{ButuceaComteEstimator},
                            target::PriorDensityTarget,
                            n)
     # should make this also depend on noise distribution etc ...
@@ -88,22 +95,41 @@ end
 
 
 function ButuceaComteEstimator(target::EBayesTarget; n::Int64)
-    h = default_bandwidth(ButuceaComte, target, n)
-    ButuceaComte(target, h)
+    h = default_bandwidth(ButuceaComteEstimator, target, n)
+    ButuceaComteEstimator(target, h)
+end
+
+function ButuceaComteEstimator(target::EBayesTarget, h::Float64)
+    #todo: remove hardcoding of Normal
+    _f(t) = cf(target,-t)/cf(Normal(),t) 
+    _set = Interval(-h,h)
+    _f_real = Fun(real ∘ _f, _set)
+    _f_imag = Fun(imag ∘ _f, _set)
+    ButuceaComteEstimator(target, h, _f_real, _f_imag)
 end
 
 function (cb::ButuceaComteEstimator)(z)
-    h = cb.h
-    target = cb.target
-    f(t) = real(exp(im*t*z)*cf(target,-t)/cf(Normal(),t))
-    res, _ = quadgk(f, -h, +h)
-    res/2/π
+    real_part = fourier(cb.f_real, z)
+    imag_part = fourier(cb.f_imag, z)
+
+    real(real_part + im*imag_part)/2/π
+    #h = cb.h
+    ##target = cb.target
+    #f(t) = real(exp(im*t*z)*cf(target,-t)/cf(Normal(),t))
+    #res, _ = quadgk(f, -h, +h) res/2π
 end
 
 function DiscretizedAffineEstimator(mhist, cb::ButuceaComteEstimator)
     DiscretizedAffineEstimator(mhist, z -> cb(z))
 end
 
+
+function estimate(target::LinearEBayesTarget, bcopt::ButuceaComteOptions, 
+                  Zs::AbstractVector{<:StandardNormalSample})
+    (bcopt.bandwidth == :auto) || error("only :auto bandwidth for now")
+    bcest = ButuceaComteEstimator(target;  n=nobs(Zs))
+    mean(bcest.(response.(Zs)))
+end 
 
 
 
