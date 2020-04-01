@@ -65,6 +65,7 @@ function loglikelihood(prior::ContinuousExponentialFamily,
     mhist = Zs_discr.mhist # need to be a bit careful...
     n_weights =  lastindex(mhist)
     ll = 0
+	n = normalize ? nobs(Zs_discr) : 1
     for i=1:n_weights
         wt = mhist[i]
         if wt > 0
@@ -80,7 +81,7 @@ function loglikelihood(prior::ContinuousExponentialFamily,
                        Zs::AbstractVector{<:StandardNormalSample};
                        integrator = expectation(prior.base_measure; n=50),
 					   normalize=true)
-	n = normalize ? length(Zs) : 1
+	n = normalize ? nobs(Zs) : 1
 	sum([log(MarginalDensityTarget(Z)(prior; integrator=integrator))/n for Z in Zs])
 end
 
@@ -114,9 +115,14 @@ Base.broadcastable(fcef::FittedContinuousExponentialFamilyModel) = Ref(fcef)
 	integrator = expectation(cefm.base_measure; n=50)
 	solver = NewtonTrustRegion()
 	optim_options = Optim.Options(show_trace=true, show_every=1, g_tol=1e-6)
-	initializer = LindseyMethod(500)
+	marginal_grid = nothing # discretize?
+	initializer = LindseyMethod(500) #TODO: make this depend on marginal_grid
 end
-
+_discretize(Zs::DiscretizedStandardNormalSamples, ::Nothing) = Zs
+_discretize(Zs::AbstractVector{<:StandardNormalSample}, ::Nothing) = Zs
+function _discretize(Zs::AbstractVector{<:StandardNormalSample}, marginal_grid::AbstractVector)
+	DiscretizedStandardNormalSamples(Zs, marginal_grid)
+end
 
 function fit(cefm::ContinuousExponentialFamilyModel,
 	         Zs::Union{EBayesSamples, DiscretizedStandardNormalSamples};
@@ -131,6 +137,7 @@ function fit(deconv::ExponentialFamilyDeconvolutionMLE,
 			 cefm = deconv.cefm
 			 @unpack c0, integrator, solver, optim_options, initializer = deconv
 
+			 Zs = _discretize(Zs, deconv.marginal_grid)
 			 n = nobs(Zs)
 			 # initialize method through Lindsey's method
 			 # this mostly makes sense for normal Zs
