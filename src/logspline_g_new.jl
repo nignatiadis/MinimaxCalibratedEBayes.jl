@@ -198,6 +198,9 @@ function fit(deconv::ExponentialFamilyDeconvolutionMLE,
 												   fitter=optim_res)
 end
 
+function fit(fcef::FittedContinuousExponentialFamilyModel, t::EBayesTarget)
+	fcef
+end
 
 function target_bias_std(target::EBayesTarget,
 	                     fcef::MinimaxCalibratedEBayes.FittedContinuousExponentialFamilyModel;
