@@ -82,6 +82,10 @@ function DiscretizedStandardNormalSamples(mhist::MCEBHistogram;
     DiscretizedStandardNormalSamples(mhist, nothing, var_proxy, f_min, f_max)
 end
 
+function DiscretizedStandardNormalSamples(marginal_grid::AbstractVector)
+	DiscretizedStandardNormalSamples(MCEBHistogram(marginal_grid))
+end
+
 response(Z_discr::DiscretizedStandardNormalSamples) = Z_discr.mhist.hist # what I want to say.
 nobs(Z_discr::DiscretizedStandardNormalSamples) = sum(Z_discr.mhist.hist.weights)
 nbins(Z_discr::DiscretizedStandardNormalSamples) = length(Z_discr.mhist.grid) + 1
@@ -100,21 +104,46 @@ function support(Z_discr::DiscretizedStandardNormalSamples)
     supp
 end
 
-# TODO: needs some work...
-function set_neighborhood(Zs::DiscretizedStandardNormalSamples,
-                          prior::Distribution;
-                          C∞_density = Inf,
-                          min_var_proxy = (C∞_density < Inf) ? C∞_density : 0.0)
 
-   f = pdf(marginalize(prior, Zs))
-   Zs = @set Zs.var_proxy = max.(f, min_var_proxy)
-   C∞ = C∞_density
-   if C∞ < Inf
-       Zs = @set Zs.f_max = f .+ C∞
-       Zs = @set Zs.f_min = max.( f .- C∞, 0.0)
-   end
-   Zs
+
+# TODO: a lot of overlap with code for set_neighborhood based on KDE
+function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
+                          prior::Distribution;
+						  C∞ = Inf,
+						  varproxy_lower_bound = false)
+    
+    grid = Zs_discr.mhist.grid
+
+	f_marginal = pdf(marginalize(prior, Zs_discr))
+
+	
+    f_max = zeros(length(f_marginal))
+    f_min = zeros(length(f_marginal))
+	var_proxy = zeros(length(f_marginal))
+    # fill in intermediate points first
+    for i in 2:length(grid)
+        x_left = grid[i-1]
+        x_right = grid[i]
+        h = x_right - x_left  # step(grid)...
+        f_max[i] = f_marginal[i] + C∞*h
+        f_min[i] = max(f_marginal[i] - C∞*h, 0.0)
+        var_proxy[i] = varproxy_lower_bound ? max(f_marginal[i], C∞*h) : f_marginal[i]
+    end
+
+    f_max[1] = Inf
+    f_min[1] = 0.0
+    var_proxy[1] = f_marginal[1]
+    f_max[end] = Inf
+    f_min[end] = 0.0
+    var_proxy[end] = f_marginal[end]
+
+    Zs_discr = @set Zs_discr.var_proxy = var_proxy
+    Zs_discr = @set Zs_discr.f_min = f_min
+    Zs_discr = @set Zs_discr.f_max = f_max
+    Zs_discr
 end
+
+
 
 
 struct DiscretizedStandardNormalSample{DISC<:DiscretizedStandardNormalSamples}

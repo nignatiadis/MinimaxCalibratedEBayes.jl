@@ -54,6 +54,14 @@ function (gmix_class::GaussianMixturePriorClass)(param_vec)
     MixtureModel(Normal, [(μ, σ_prior) for μ in grid], param_vec)
 end
 
+# TODO: more rigorous projection onto simplex?
+function fix_πs(gmix_class::GaussianMixturePriorClass, πs)
+    πs = max.(πs, 0.0)
+    πs = πs ./ sum(πs)
+end
+
+fix_πs(::ConvexPriorClass, πs) = πs
+
 
 # In fact all computations with marginalized object.
 
@@ -142,16 +150,18 @@ function get_δ(model; recalculate_δ = false)
     end
 end
 
+# TODO: figure out why this errors
 function idx_enforce_lower_bound(prior_class::ConvexPriorClass, Z::DiscretizedStandardNormalSamples)
-    1:length(Z.fmin)
+    2:(length(Z.f_max)-1)#1:length(Z.f_min)
 end 
 
 function idx_enforce_lower_bound(prior_class::GaussianMixturePriorClass, Z::DiscretizedStandardNormalSamples)
     findall( Z.f_min .> 0.0)
 end 
 
+# TODO: figure out why this errors
 function idx_enforce_upper_bound(prior_class::ConvexPriorClass, Z::DiscretizedStandardNormalSamples)
-    1:length(Z.fmax)
+    2:(length(Z.f_max)-1)#1:length(Z.f_max)
 end 
 
 function idx_enforce_upper_bound(prior_class::GaussianMixturePriorClass, Z::DiscretizedStandardNormalSamples)
@@ -184,7 +194,6 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
         @constraint(model, f2_lower, fs2[idx_nonzero] .>= Z.f_min[idx_nonzero])
     end
 
-
     L1 = linear_functional(prior_class, target, πs1)
     L2 = linear_functional(prior_class, target, πs2)
 
@@ -193,8 +202,7 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
 
     f̄s_sqrt = sqrt.(Z.var_proxy)
     model[:f̄s_sqrt] = f̄s_sqrt
-                    #pseudo_chisq_dist = sum( (fs1 .- fs2).^2)
-                                        #@constraint(model, pseudo_chisq_dist <= δ)
+                   
     @variable(model, δ_up)
     model[:δ_up] = δ_up
 
@@ -371,12 +379,10 @@ function SteinMinimaxEstimator(Z::DiscretizedStandardNormalSamples,
     πs1 = JuMP.value.(model[:πs1])
     πs2 = JuMP.value.(model[:πs2])
 
-    πs1 = max.(πs1, 0.0)
-    πs1 = πs1 ./ sum(πs1)
+    πs1 = fix_πs(prior_class, πs1)
+    πs2 = fix_πs(prior_class, πs2)
 
-    πs2 = max.(πs2, 0.0)
-    πs2 = πs2 ./ sum(πs2)
-
+    
     g1 = prior_class(πs1)
     g2 = prior_class(πs2)
 
@@ -465,35 +471,94 @@ function StatsBase.confint(target::EBayesTarget,
     L,U
 end
 
+
+
 @userplot SteinMinimaxPlot
 
-@recipe function f(h::SteinMinimaxPlot; x_grid = -5:0.01:5)
-
+@recipe function f(h::SteinMinimaxPlot; x_grid = -5:0.01:5,
+	                                          ylim_calibrator = nothing,
+											  ylim_relative_offset = 1.25)
+	arg_length = length(h.args)
+	arg_length <= 2 || error("at most two plots allowed")
     sme = first(h.args)
-    layout := @layout [panel1 panel2 panel3]
 
-    # main histogram2d
+	if arg_length == 2
+		sme_band = last(h.args)
+		layout := @layout [a{0.45w} grid(2,2)]
+	else 
+		layout := @layout [panel1 panel2 panel3]
+	end
+	
+	
+	def_size = (850,260)
+
+	col_g1 = RGB(77/255,137/255,193/255)
+	col_gm1 = RGB(73/255,2/255,53/255)
+	col_band = "#F6CD7F"#RGB(243/255,232/255,176/255)
+	fg_legend --> :transparent
+	bg_legend --> :transparent
+
     @series begin
         seriestype := :path
         subplot := 1
+		linestyle := :dash
+		if !isnothing(ylim_calibrator)
+			ylim := ylim_calibrator
+		end
         #xlim := extrema(x_grid)
+	    color := RGB(205/255,84/255,150/255)	# RGB(68/255,60/255,145/255)
+		label := "Minimax"
         sme.Q
     end
+	
+	@series begin
+		seriestype := :path
+		subplot := 1
+		linestyle := :solid
+		color := RGB(132/255,193/255,216/255)	
+		#xlim := extrema(x_grid)
+	    label := L"Minimax-$\infty$"
+        title := "a)"
+		legend := :topright
+		sme_band.Q
+	end
+	
 
     # upper histogram
     g1 = sme.g1
     g2 = sme.g2
     g1_xs = pdf.(g1, x_grid)
     g2_xs = pdf.(g2, x_grid)
+	ylim_prior = maximum([g1_xs;g2_xs])*ylim_relative_offset
     @series begin
         seriestype := :path
         subplot := 2
-        linecolor --> [:pink :purple]
-        label := ["g1" "g2"]
+        linecolor := [col_g1 col_gm1]
+        label :=  [L"g_1" L"g_{-1}"]
+		ylim := (0, ylim_prior)
+        title := "b)"
+		legend := :topright
         x_grid, [g1_xs g2_xs]
     end
+	
+	if (arg_length == 2)
+		g1_band = sme_band.g1
+		g2_band = sme_band.g2
+		g1_xs = pdf.(g1_band, x_grid)
+		g2_xs = pdf.(g2_band, x_grid)
+		@series begin
+			seriestype := :path
+			subplot := 4
+			linecolor := [col_g1 col_gm1]
+			label :=  [L"g_1" L"g_{-1}"]
+			ylim := (0, maximum([g1_xs;g2_xs])*ylim_relative_offset)
+            title := "d)"
+			legend := :topright
+			x_grid, [g1_xs g2_xs]
+		end
+	end
 
-
+	# hardcoding for now to only work with StandardNormal
     Z=sme.Z
     Z_continuous = StandardNormalSample(0.0)
 
@@ -503,12 +568,60 @@ end
     f1_xs=pdf.(f1, x_grid)
     f2_xs=pdf.(f2, x_grid)
 
+	ylim_marginal = maximum([f1_xs;f2_xs])*ylim_relative_offset
     @series begin
         seriestype := :path
         subplot := 3
-        linecolor --> [:orange :brown]
+		label :=  [L"f_{g_{1}}" L"f_{g_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
+        linecolor --> [col_g1 col_gm1]
+		ylim --> (0, ylim_marginal)
+        title := "c)"
+		legend := :topright
         x_grid, [f1_xs f2_xs]
     end
+	
+	if (arg_length == 2)
+		f1_band=marginalize(g1_band, Z_continuous)
+		f2_band=marginalize(g2_band, Z_continuous)
+
+		f1_xs=pdf.(f1_band, x_grid)
+		f2_xs=pdf.(f2_band, x_grid)
+
+		@series begin
+			seriestype := :path
+			subplot := 5
+		    label :=  [L"f_{g_{1}}" L"f_{g_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
+			linecolor --> [col_g1 col_gm1]
+            ylim := (0, ylim_marginal)
+            title := "e)"
+            legend := :topright
+			x_grid, [f1_xs f2_xs]
+		end	
+        
+        @series begin
+            subplot := 5
+            xs = midpoints(sme_band.Z.mhist.grid)
+            h = step(sme_band.Z.mhist.grid)
+            ys_lower = sme_band.Z.f_min[2:(end-1)] ./ h
+            ys_upper = sme_band.Z.f_max[2:(end-1)] ./ h
+            # hack for now 
+            fillrange := ys_upper
+            color := col_band
+            label := L"$\infty$-Band"
+            xs, ys_lower
+        end	
+        
+        @series begin
+            seriestype := :path
+            subplot := 5
+            label :=  nothing#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
+            linecolor --> [col_g1 col_gm1]
+            ylim := (0, ylim_marginal)
+            title := "e)"
+            legend := :topright
+            x_grid, [f1_xs f2_xs]
+        end	
+	end
 end
 
 

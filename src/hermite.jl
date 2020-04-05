@@ -133,3 +133,22 @@ function (hermite_class::HermitePriorClass)(param_vec)
     q = hermite_class.qmax
   	HermiteQuasiDistribution(q, param_vec)
 end
+
+
+# temporary hacks
+struct GaussianHermite 
+	f
+end 
+
+function marginalize(hermite_dbn::HermiteQuasiDistribution, Z::StandardNormalSample)
+  αs = hermite_dbn.coefs
+  qmax = hermite_dbn.q
+  GaussianHermite(x -> sum([αs[i+1]*_tmp_conv(i,x) for i in 0:qmax]))
+end 
+
+function _tmp_conv(j, x)
+	j = big(j)
+	big(1/sqrt(2*sqrt(pi)*2^j*factorial(j))*exp(-x^2/4)*x^j)
+end 
+pdf(g::GaussianHermite, x) = Float64(g.f(x))
+broadcastable(g::GaussianHermite) = Ref(g)

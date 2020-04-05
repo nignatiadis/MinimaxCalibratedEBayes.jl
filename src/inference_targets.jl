@@ -88,20 +88,20 @@ end
 
 
 
-#--- OneSidedPriorTailProbability
-Base.@kwdef struct OneSidedPriorTailProbability <: LinearEBayesTarget
+#--- PriorTailProbability
+Base.@kwdef struct PriorTailProbability <: LinearEBayesTarget
     cutoff::Float64 = 0.0
 end
 
-function extrema(target::OneSidedPriorTailProbability)
+function extrema(target::PriorTailProbability)
 	(0, 1)
 end
 
-function riesz_representer(target::OneSidedPriorTailProbability, t)
+function riesz_representer(target::PriorTailProbability, t)
     one(Float64)*(t >= target.cutoff)
 end
 
-function (target::OneSidedPriorTailProbability)(prior)
+function (target::PriorTailProbability)(prior)
 	ccdf(prior, target.cutoff)
 end
 
