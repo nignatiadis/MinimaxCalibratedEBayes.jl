@@ -582,7 +582,7 @@ end
         seriestype := :path
         subplot := 3
         xlim := extrema(x_grid)
-		label :=  [L"f_{g_{1}}" L"f_{g_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
+		label :=  [L"f_{G_{1}}" L"f_{G_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
         linecolor --> [col_g1 col_gm1]
 		ylim --> (0, ylim_marginal)
         title := "c)"
@@ -601,7 +601,7 @@ end
 		@series begin
 			seriestype := :path
 			subplot := 5
-		    label :=  [L"f_{g_{1}}" L"f_{g_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
+		    label :=  [L"f_{G_{1}}" L"f_{G_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
 			linecolor --> [col_g1 col_gm1]
 			x_grid, [f1_xs f2_xs]
 		end	
