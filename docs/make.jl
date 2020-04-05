@@ -1,8 +1,11 @@
 using Documenter, MinimaxCalibratedEBayes
+const MCEB = MinimaxCalibratedEBayes
 
 makedocs(;
     modules=[MinimaxCalibratedEBayes],
-    format=Documenter.HTML(),
+    format=  Documenter.HTML(
+        prettyurls = get(ENV, "CI", nothing) == "true"
+    ),
     pages=[
         "Home" => "index.md",
     ],

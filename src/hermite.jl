@@ -51,6 +51,20 @@ function (target::MarginalDensityTarget{<:DiscretizedStandardNormalSample})(inte
     integrator(base_integrand)
 end
 
+# Here ``g^*(t) = \\int \\exp(2 i \\pi \\mu) g(\\mu)d\\mu$ is the Fourier transform of ``g``.
+"""
+	HermitePriorClass(qmax, sobolev_order, sobolev_bound, solver)
+	
+Class of densities ``g \\in \\mathcal{G}`` that can be written as ``g(\\mu) = \\sum_{j=0}^{qmax} h_j(\\mu)``, where
+``h_j`` is the ``j``-th Hermite function and further satisfy the Sobolev constraint
+(with `sobolev_order` corresponding to ``b`` and `sobolev_bound` to ``C``): 
+
+```math
+\\int_{-\\infty}^{\\infty} |g^*(t)|^2(t^2+1)^b dt \\leq 2\\pi C
+```
+The `solver` object is a `MathOptInterface` compatible optimizer such as `Mosek.Optimizer` that will be 
+used to solve the convex modulus of continuity (or worst-case-bias estimation) problem.
+"""
 Base.@kwdef mutable struct HermitePriorClass{T<:Real} <: ConvexPriorClass
 	qmax::Integer
 	sobolev_order::T  #not necessarily but should suffice for now
