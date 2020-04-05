@@ -43,10 +43,6 @@ marginal_fit_nbhood = SteinMinimaxEstimator(Zs_discr_nbhood, gmix,
 bc_marginal = MCEB.ButuceaComteEstimator(marginal_target;  n=n_marginal)
 bc_marginal_affine = DiscretizedAffineEstimator(Zs_big_var.mhist, bc_marginal)
 
-bias11 = worst_case_bias(marginal_fit.Q, Zs_discr_var, gmix, marginal_target).max_abs_bias
-bias12 = worst_case_bias(marginal_fit.Q, Zs_discr_nbhood, gmix, marginal_target).max_abs_bias
-bias22 = worst_case_bias(marginal_fit_nbhood.Q, Zs_discr_var, gmix, marginal_target).max_abs_bias
-
 
 
 
@@ -101,10 +97,6 @@ savefig(marginal_density_affine, "marginal_density_affine.pdf")
 
 
 
-
-
-
-
 n_prior_cdf = 200
 prior_cdf_target = PriorTailProbability(0.0)
 
@@ -116,48 +108,68 @@ prior_cdf_fit_nbhood = SteinMinimaxEstimator(Zs_discr_nbhood, gmix,
 									  prior_cdf_target, MCEB.RMSE(n_prior_cdf, 0.0))
 
 
+									  
+latex_minimax_tbl("prior_cdf_affine.tex",
+                ["Minimax" => (prior_cdf_fit.Q,Zs_discr_var, Zs_discr_nbhood),
+                 L"Minimax-$\infty$" => (prior_cdf_fit_nbhood.Q, Zs_discr_var, Zs_discr_nbhood)],  
+                 gmix, prior_cdf_target, n_prior_cdf)
+
 prior_cdf_affine = steinminimaxplot(prior_cdf_fit, prior_cdf_fit_nbhood; size=def_size,
 									  					 ylim_relative_offset=1.4)
 
-savefig(prior_cdf_affine, "prior_cdf_affine.pdf")
+savefig(prior_cdf_affine, "prior_cdf_affine.pdf") 
 
 n_prior_density = 200
 prior_density_target = PriorDensityTarget(0.0)
 
 
-prior_dbn = Normal(0, 2)
+prior_dbn_normal = Normal(0, 2)
 
 using QuadGK
 myf = quadgk(t->abs2(cf(prior_dbn,t))*(t^2+1)^2, -Inf, +Inf)[1]/(2*π)
 #│ `with_optimizer(Ipopt.Optimizer, max_cpu_time=60.0)` becomes `optimizer_with_attributes(Ipopt.Optimizer, "max_cpu_time" => 60.0)`.
-Zs_discr = DiscretizedStandardNormalSamples(marginal_grid)
-Zs_discr_var = @set Zs_discr.var_proxy = pdf(marginalize(prior_dbn, Zs_discr))
-Zs_discr_nbhood = set_neighborhood(Zs_discr, prior_dbn; C∞ = C∞)
+Zs_discr_var_normal = @set Zs_discr.var_proxy = pdf(marginalize(prior_dbn_normal, Zs_discr))
+Zs_discr_nbhood_normal = set_neighborhood(Zs_discr, prior_dbn_normal; C∞ = C∞)
+
+Zs_big = DiscretizedStandardNormalSamples(-15:0.01:15)
+Zs_big_var_normal = @set Zs_big.var_proxy = pdf(marginalize(prior_dbn_normal, Zs_big))
+Zs_big_nbhood_normal = set_neighborhood(Zs_big, prior_dbn_normal; C∞ = C∞)
 
 
 hmclass = MCEB.HermitePriorClass(qmax=90, sobolev_order=2, sobolev_bound=0.5,
                                  solver=Mosek.Optimizer, solver_params = (QUIET=true,))
 
-prior_density_fit = SteinMinimaxEstimator(Zs_discr_var, hmclass,
-								          prior_density_target,MCEB.RMSE(n_prior_density,0.0))
+prior_density_fit = SteinMinimaxEstimator(Zs_discr_var_normal, hmclass,
+								          prior_density_target, MCEB.RMSE(n_prior_density,0.0))
 
-prior_density_fit_nbhood = SteinMinimaxEstimator(Zs_discr_nbhood, hmclass,
-								   prior_density_target, MCEB.FixedDelta(0.0857))
-
-tmp = marginalize(prior_density_fit.g1, StandardNormalSample(0.0))
-ys_tmp = pdf.(tmp, marginal_grid)
-
-pgfplotsx()
-steinminimaxplot(prior_density_fit, prior_density_fit_nbhood )
-using QuadGK
-quadgk(tmp.f, -90, 90)
-
-
+prior_density_fit_nbhood = SteinMinimaxEstimator(Zs_discr_nbhood_normal, hmclass,
+								   prior_density_target, MCEB.RMSE(n_prior_density,0.0))
 
 bc_prior = MCEB.ButuceaComteEstimator(prior_density_target;  n=n_prior_density)
-tmp_qs = bc_prior.(marginal_grid)
-gr()
-steinminimaxplot(prior_density_fit, prior_density_fit)
+bc_prior_affine_small = DiscretizedAffineEstimator(Zs_discr_var_normal.mhist, bc_prior)
+
+bc_prior_affine = DiscretizedAffineEstimator(Zs_big_var_normal.mhist, bc_prior)
+
+#0.0856
+tmp1 = worst_case_bias(bc_prior_affine, Zs_big_var_normal, hmclass, prior_density_target)
+tmp2 = worst_case_bias(bc_prior_affine_small, Zs_discr_var_normal, hmclass, prior_density_target)
+
+
+tmp4 = worst_case_bias(bc_prior_affine, Zs_big_nbhood_normal, hmclass, prior_density_target)
+
+
+
+
+plot(bc_prior_affine)
+ys = pdf.(tmp4.min_g, -15:0.01:15)
+
+plot(-15:0.01:15, ys)
+
+latex_minimax_tbl("prior_density_affine.tex",
+                  ["Minimax" => (prior_density_fit.Q,Zs_discr_var_normal, Zs_discr_nbhood_normal),
+                   L"Minimax-$\infty$" => (prior_density_fit_nbhood.Q, Zs_discr_var_normal, Zs_discr_nbhood_normal),
+				   "Butucea-Comte" => (bc_prior_affine, Zs_big_var_normal, Zs_big_nbhood_normal)],  
+                   hmclass, prior_density_target, n_prior_density)
 
 
 

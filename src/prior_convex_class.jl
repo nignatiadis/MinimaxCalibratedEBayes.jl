@@ -524,6 +524,7 @@ end
 	    label := L"Minimax-$\infty$"
         title := "a)"
 		legend := :topright
+        xguide := L"x"
 		sme_band.Q
 	end
 	
@@ -542,6 +543,7 @@ end
         xlim := extrema(x_grid)
 		ylim := (0, ylim_prior)
         title := "b)"
+        xguide := L"\mu"
 		legend := :topright
         x_grid, [g1_xs g2_xs]
     end
@@ -560,6 +562,7 @@ end
 			ylim := (0, maximum([g1_xs;g2_xs])*ylim_relative_offset)
             title := "d)"
 			legend := :topright
+            xguide := L"\mu"
 			x_grid, [g1_xs g2_xs]
 		end
 	end
@@ -584,6 +587,7 @@ end
 		ylim --> (0, ylim_marginal)
         title := "c)"
 		legend := :topright
+        xguide := L"x"
         x_grid, [f1_xs f2_xs]
     end
 	
@@ -628,6 +632,7 @@ end
             xlim := extrema(x_grid)
             title := "e)"
             legend := :topright
+            xguide := L"x"
             x_grid, [f1_xs f2_xs]
         end	
 	end
