@@ -83,22 +83,23 @@ end
 
 function worst_case_bias(Q::DiscretizedAffineEstimator,
                   Z::DiscretizedStandardNormalSamples,
-                  gmix_class::ConvexPriorClass,
+                  prior_class::ConvexPriorClass,
                   target::LinearEBayesTarget;
                   boundary_mass = Inf)
 
-    model = Model(with_optimizer(gmix_class.solver; gmix_class.solver_params...))
-    πs = add_prior_variables!(model, gmix_class; var_name = "πs")
-    fs = marginalize(gmix_class, Z, πs)
-    L = linear_functional(gmix_class, target, πs)
+    model = Model(with_optimizer(prior_class.solver; prior_class.solver_params...))
+    πs = add_prior_variables!(model, prior_class; var_name = "πs")
+    fs = marginalize(prior_class, Z, πs)
+    L = linear_functional(prior_class, target, πs)
 
 
     if (!isnothing(Z.f_max))
-        @constraint(model, f1_upper, fs .<= Z.f_max)
+        idx_upper = idx_enforce_upper_bound(prior_class, Z)#
+        @constraint(model, f1_upper, fs[idx_upper] .<= Z.f_max[idx_upper])
     end
 
     if (!isnothing(Z.f_min))
-        idx_nonzero = idx_enforce_lower_bound(gmix_class, Z) #
+        idx_nonzero = idx_enforce_lower_bound(prior_class, Z) #
         @constraint(model, f1_lower, fs[idx_nonzero] .>= Z.f_min[idx_nonzero])
     end
 
@@ -114,13 +115,15 @@ function worst_case_bias(Q::DiscretizedAffineEstimator,
     @objective(model, Max, Q.Qo + dot(Q.Q,fs) - L)
     optimize!(model)
     max_bias = objective_value(model)
-    max_g = gmix_class(JuMP.value.(πs))
+    
+    # TODO let prior_class function do this by itself
+    max_g = prior_class(fix_πs(prior_class, JuMP.value.(πs))) 
 
 
     @objective(model, Min, Q.Qo + dot(Q.Q,fs) - L)
     optimize!(model)
     min_bias = objective_value(model)
-    min_g = gmix_class(JuMP.value.(πs))
+    min_g = prior_class(fix_πs(prior_class, JuMP.value.(πs)))
 
     max_abs_bias = max(abs(max_bias), abs(min_bias))
 
@@ -152,7 +155,7 @@ end
 
 # TODO: figure out why this errors
 function idx_enforce_lower_bound(prior_class::ConvexPriorClass, Z::DiscretizedStandardNormalSamples)
-    2:(length(Z.f_max)-1)#1:length(Z.f_min)
+    1:length(Z.f_min)#1:length(Z.f_min)
 end 
 
 function idx_enforce_lower_bound(prior_class::GaussianMixturePriorClass, Z::DiscretizedStandardNormalSamples)
@@ -161,7 +164,7 @@ end
 
 # TODO: figure out why this errors
 function idx_enforce_upper_bound(prior_class::ConvexPriorClass, Z::DiscretizedStandardNormalSamples)
-    2:(length(Z.f_max)-1)#1:length(Z.f_max)
+    findall( Z.f_max .< 1/sqrt(2π))#1:length(Z.f_max)
 end 
 
 function idx_enforce_upper_bound(prior_class::GaussianMixturePriorClass, Z::DiscretizedStandardNormalSamples)
@@ -477,7 +480,8 @@ end
 
 @recipe function f(h::SteinMinimaxPlot; x_grid = -5:0.01:5,
 	                                          ylim_calibrator = nothing,
-											  ylim_relative_offset = 1.25)
+											  ylim_relative_offset = 1.25,
+                                              ylim_panel_e = nothing)
 	arg_length = length(h.args)
 	arg_length <= 2 || error("at most two plots allowed")
     sme = first(h.args)
@@ -505,7 +509,7 @@ end
 		if !isnothing(ylim_calibrator)
 			ylim := ylim_calibrator
 		end
-        #xlim := extrema(x_grid)
+        xlim := extrema(x_grid)
 	    color := RGB(205/255,84/255,150/255)	# RGB(68/255,60/255,145/255)
 		label := "Minimax"
         sme.Q
@@ -516,7 +520,7 @@ end
 		subplot := 1
 		linestyle := :solid
 		color := RGB(132/255,193/255,216/255)	
-		#xlim := extrema(x_grid)
+		xlim := extrema(x_grid)
 	    label := L"Minimax-$\infty$"
         title := "a)"
 		legend := :topright
@@ -535,6 +539,7 @@ end
         subplot := 2
         linecolor := [col_g1 col_gm1]
         label :=  [L"g_1" L"g_{-1}"]
+        xlim := extrema(x_grid)
 		ylim := (0, ylim_prior)
         title := "b)"
 		legend := :topright
@@ -551,6 +556,7 @@ end
 			subplot := 4
 			linecolor := [col_g1 col_gm1]
 			label :=  [L"g_1" L"g_{-1}"]
+            xlim := extrema(x_grid)
 			ylim := (0, maximum([g1_xs;g2_xs])*ylim_relative_offset)
             title := "d)"
 			legend := :topright
@@ -572,6 +578,7 @@ end
     @series begin
         seriestype := :path
         subplot := 3
+        xlim := extrema(x_grid)
 		label :=  [L"f_{g_{1}}" L"f_{g_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
         linecolor --> [col_g1 col_gm1]
 		ylim --> (0, ylim_marginal)
@@ -592,9 +599,6 @@ end
 			subplot := 5
 		    label :=  [L"f_{g_{1}}" L"f_{g_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
 			linecolor --> [col_g1 col_gm1]
-            ylim := (0, ylim_marginal)
-            title := "e)"
-            legend := :topright
 			x_grid, [f1_xs f2_xs]
 		end	
         
@@ -607,7 +611,7 @@ end
             # hack for now 
             fillrange := ys_upper
             color := col_band
-            label := L"$\infty$-Band"
+            label := L"$\infty$-band"
             xs, ys_lower
         end	
         
@@ -616,7 +620,12 @@ end
             subplot := 5
             label :=  nothing#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
             linecolor --> [col_g1 col_gm1]
-            ylim := (0, ylim_marginal)
+            if isnothing(ylim_panel_e)
+                ylim := (0, ylim_marginal)
+            else 
+                ylim := ylim_panel_e
+            end
+            xlim := extrema(x_grid)
             title := "e)"
             legend := :topright
             x_grid, [f1_xs f2_xs]
