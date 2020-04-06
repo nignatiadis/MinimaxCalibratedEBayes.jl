@@ -1,2 +1,4 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+ExponentialFamilies = "49aacbaa-bd10-4545-ba27-0a7ca180d7f7"
+Splines2 = "5a560754-308a-11ea-3701-ef72685e98d6"
