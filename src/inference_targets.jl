@@ -10,6 +10,13 @@ abstract type EBayesTarget end
 # functions so that EBayesTargets can play nicely with vectorization
 broadcastable(target::EBayesTarget) = Ref(target)
 
+
+""" 
+	extrema(target::EBayesTarget)
+	
+Returns a tuple `(a,b)` such that ` a ≦ target ≦ b` is always true. By default this
+is ``(-\\infty,+\\infty)``, but e.g., for a `PriorTailProbability` it returns `(0,1)`.
+"""	
 function extrema(target::EBayesTarget) #fallback
 	(-Inf, Inf)
 end
@@ -36,6 +43,26 @@ Abstract type for Empirical Bayes estimands that are linear functionals of the p
 i.e., they take the form ``L(G)`` for some function linear functional ``L``.
 """
 abstract type LinearEBayesTarget <: EBayesTarget end
+
+
+"""
+	cf(::LinearEBayesTarget, t)
+	
+The characteristic function of ``L(\\cdot)``, a `LinearEBayesTarget`, which we define as follows:
+	
+For ``L(\\cdot)`` which may be written as ``L(G) = \\int \\psi(\\mu)dG\\mu`` 
+(for a measurable function ``\\psi``) this returns the Fourier transform of ``\\psi``
+evaluated at t, i.e., ``\\psi^*(t) = \\int \\exp(it x)\\psi(x)dx``. 
+
+
+Note that ``\\psi^*(t)`` is such that for distributions ``G`` with density ``g``
+(and ``g^*`` the Fourier Transform of ``g``) the following holds:
+
+```math
+L(G) = \\frac{1}{2\\pi}\\int g^*(\\mu)\\psi^*(\\mu) d\\mu
+```
+"""
+function cf(::LinearEBayesTarget, t) end
 
 location(target::LinearEBayesTarget) = target.Z
 
