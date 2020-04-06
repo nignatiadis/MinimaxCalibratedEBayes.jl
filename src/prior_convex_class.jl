@@ -10,12 +10,12 @@ abstract type ConvexPriorClass end
 """
 	GaussianMixturePriorClass(σ_prior, grid, solver)
 	
-Class of densities ``g \\in \\mathcal{G}`` that can be written as the convolution of a Normal 
+Class of distributions ``G \\in \\mathcal{G}`` that can be written as the convolution of a Normal 
 distribution with standard deviation `σ_prior` and a discrete distribution ``\\pi``
 supported on `grid`.
 
 ```math
- g(\\mu) = \\mathcal{N}(0,\\sigma_{\\text{prior}^2) \\star \\pi
+G = \\mathcal{N}(0,\\sigma_{\\text{prior}}^2) \\star \\pi
 ``` 
 
 The `solver` object is a `MathOptInterface` compatible optimizer such as `Mosek.Optimizer` that will be 

@@ -1,3 +1,8 @@
+"""
+	EBayesTarget
+	
+Abstract type that describe Empirical Bayes estimands (which we want to estimate or conduct inference for).
+"""
 abstract type EBayesTarget end
 
 # maybe have a distinction between 1D EBayes Target and 2D.
@@ -17,8 +22,19 @@ function (targets::AbstractVector{<:EBayesTarget})(prior)
 	[target(prior) for target in targets]
 end
 
-
+"""
+	PosteriorEBayesTarget <: EBayesTarget
+	
+Abstract type for Empirical Bayes estimands that take the form ``E_G[h(\\mu) \\mid Z_i = z]`` for some function ``h``.
+"""
 abstract type PosteriorEBayesTarget <: EBayesTarget end
+
+"""
+	LinearEBayesTarget <: EBayesTarget
+	
+Abstract type for Empirical Bayes estimands that are linear functionals of the prior ``G``,
+i.e., they take the form ``L(G)`` for some function linear functional ``L``.
+"""
 abstract type LinearEBayesTarget <: EBayesTarget end
 
 location(target::LinearEBayesTarget) = target.Z
@@ -39,6 +55,28 @@ end
 
 #--- MarginalDensityTarget
 
+
+"""
+	MarginalDensityTarget(Z::StandardNormalSample) <: LinearEBayesTarget
+
+## Example call
+```julia
+MarginalDensityTaget(StandardNormalSample(2.0))
+```
+## Description 		
+Describes the marginal density evaluated at ``Z=z``  (e.g. ``Z=2`` in the example above)
+of a sample drawn from the hierarchical model 
+```math
+\\mu \\sim G, Z \\sim \\mathcal{N}(0,1)
+```
+In other words, letting ``\\phi`` the Standard Normal pdf
+```math
+L(G) = \\phi \\star dG(z)
+```
+Note that `2.0` has to be wrapped inside `StandardNormalSample(2.0)` since this target
+depends not only on `G` and the location, but also on the likelihood. Additional
+likelihoods will be added in the future.
+"""
 struct MarginalDensityTarget{NS} <: LinearEBayesTarget
     Z::NS
 end
@@ -60,7 +98,18 @@ function extrema(target::MarginalDensityTarget{<:StandardNormalSample})
 	(0, 1/sqrt(2π))
 end
 
-#--- PriorDensityTarget
+
+"""
+	PriorDensityTarget(z::Float64) <: LinearEBayesTarget
+
+## Example call
+```julia
+PriorDensityTarget(2.0)
+```
+## Description 		
+This is the evaluation functional of the density of ``G`` at `z`, i.e.,
+``L(G) = G'(z) = g(z)`` or in Julia code `L(G) = pdf(G, z)`.
+"""
 struct PriorDensityTarget <: LinearEBayesTarget
     x::Float64
 end
@@ -89,6 +138,17 @@ end
 
 
 #--- PriorTailProbability
+"""
+	PriorTailProbability(cutoff::Float64) <: LinearEBayesTarget
+
+## Example call
+```julia
+PriorTailProbability(2.0)
+```
+## Description 		
+This is the evaluation functional of the tail probability of ``G`` at `cutoff`, i.e.,
+``L(G) = 1-G(\\text{cutoff})`` or in Julia code `L(G) = ccdf(G, z)`.
+"""
 Base.@kwdef struct PriorTailProbability <: LinearEBayesTarget
     cutoff::Float64 = 0.0
 end
