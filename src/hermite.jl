@@ -72,7 +72,7 @@ Base.@kwdef mutable struct HermitePriorClass{T<:Real} <: ConvexPriorClass
 	integrators = expectation.(HermiteBasisFunction.(0:qmax), Ref(DEFAULT_HERMITE_INTEGRATOR))
 	squared_integrator = DEFAULT_SQUARED_HERMITE_INTEGRATOR
 	solver = nothing
-	solver_params = ()
+	solver_params = []
 end
 
 function add_prior_variables!(model::JuMP.Model, hermite_class::HermitePriorClass; var_name = "πs") # adds constraints

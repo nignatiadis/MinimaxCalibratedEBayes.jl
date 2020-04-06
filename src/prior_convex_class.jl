@@ -29,7 +29,7 @@ mutable struct GaussianMixturePriorClass{T<:Real,
     solver_params
 end
 
-GaussianMixturePriorClass(σ_prior, grid, solver) = GaussianMixturePriorClass(σ_prior, grid, solver, ())
+GaussianMixturePriorClass(σ_prior, grid, solver) = GaussianMixturePriorClass(σ_prior, grid, solver, [])
 #GaussianMixturePriorClass(σ_prior, grid) = GaussianMixturePriorClass(σ_prior, grid, Gurobi.Optimizer)
 
 length(gmix_class::GaussianMixturePriorClass) = length(gmix_class.grid)
@@ -104,7 +104,7 @@ function worst_case_bias(Q::DiscretizedAffineEstimator,
                   target::LinearEBayesTarget;
                   boundary_mass = Inf)
 
-    model = Model(with_optimizer(prior_class.solver; prior_class.solver_params...))
+    model = Model(optimizer_with_attributes(prior_class.solver, prior_class.solver_params...))
     πs = add_prior_variables!(model, prior_class; var_name = "πs")
     fs = marginalize(prior_class, Z, πs)
     L = linear_functional(prior_class, target, πs)
@@ -192,7 +192,7 @@ function initialize_modulus_problem(Z::DiscretizedStandardNormalSamples,
                                     prior_class::ConvexPriorClass,
                                     target::EBayesTarget)
 
-    model = Model(with_optimizer(prior_class.solver; prior_class.solver_params...))
+    model = Model(optimizer_with_attributes(prior_class.solver, prior_class.solver_params...))
     πs1 = add_prior_variables!(model, prior_class; var_name = "πs1")
     πs2 = add_prior_variables!(model, prior_class; var_name = "πs2")
 
