@@ -22,9 +22,16 @@ n_marginal = 10_000
 gmix = GaussianMixturePriorClass(0.2, -3:0.01:3, Mosek.Optimizer, (QUIET=true,))
 
 
+
+
 C∞ = 0.02
 
+gmix = GaussianMixturePriorClass(0.2, -3:0.01:3, ECOS.Optimizer)
 
+single_fit = SteinMinimaxEstimator(Zs_discr_var, gmix,
+                                     marginal_target, MCEB.FixedDelta(0.001))
+
+plot(single_fit.Q)
 Zs_big = DiscretizedStandardNormalSamples(-10:0.005:10)
 Zs_big_var = @set Zs_big.var_proxy = pdf(marginalize(prior_dbn, Zs_big))
 Zs_big_nbhood = set_neighborhood(Zs_big, prior_dbn; C∞ = C∞)
