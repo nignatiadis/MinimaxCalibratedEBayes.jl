@@ -11,8 +11,7 @@ makedocs(;
         "Manual" => Any[
             "man/targets.md",
             "man/prior_classes.md",
-            "man/discretization.md",
-            "man/localization.md",
+            "man/samples.md",
             "man/pilot.md"],
     ],
     repo="https://github.com/nignatiadis/MinimaxCalibratedEBayes.jl/blob/{commit}{path}#L{line}",

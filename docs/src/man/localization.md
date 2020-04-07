@@ -1,3 +1,0 @@
-# Localization 
-
-## Neighborhood construction

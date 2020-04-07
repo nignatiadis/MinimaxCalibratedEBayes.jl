@@ -9,6 +9,9 @@ The ingredients of the approach are the following.
 
 
 
+  >Ignatiadis, Nikolaos, and Stefan Wager. "Bias-Aware Confidence Intervals for Empirical Bayes Analysis." [arXiv:1902.02774](https://arxiv.org/abs/1902.02774) (2019)
+
+
 
 ## Installation
 

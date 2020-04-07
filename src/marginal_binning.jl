@@ -35,9 +35,30 @@ lastindex(mhist::MCEBHistogram) = lastindex(mhist.hist.weights)
 pdf(mh::MCEBHistogram) = mh.hist.weights ./ sum(mh.hist.weights)
 midpoints(mh::MCEBHistogram) = midpoints(mh.grid)
 
+"""
+	DiscretizedStandardNormalSamples(marginal_grid)
 
-# DiscretizedStandardNormalSamples
+This type represents discretization of Standard Normal Samples to the grid `marginal_grid`.
+Let ``t_1 < \\dotsc, < t_K`` the elements of `marginal_grid`, then this
+type implies that we map each sample ``Z \\sim \\mathcal{N}(0,1)`` to one of the intervals
+``[t_j, t_{j+1}),j=0,\\dotsc,K``, with ``t_0 = -\\infty`` and ``t_{k+1} =  +\\infty``.
+ Our inference will depend only on the discretized samples.
 
+	DiscretizedStandardNormalSamples(Zs::AbstractVector{<:StandardNormalSample}, marginal_grid)
+
+If we also provide the constructor with a vector of `StandardNormalSample`'s, then it also
+stores the Histogram of the samples (according to the binning defined above) in the `mhist` slot. 
+The is a multinomial summarization of the original data.
+	
+The `DiscretizedStandardNormalSamples` type also contains three more slots:
+
+* `f_min`,`f_max`: These can be either `nothing` or vectors of length equal to the number of 
+histogram bins. They contain bounds so that:
+```math
+f_{\\text{min}}[k] \\leq \\mathbb P_G[ Z \\in \\text{bin }k] \\leq f_{\\text{max}}[k] 
+```
+* `var_proxy`: This is typically a vector of point estimates of ``\\mathbb P_G[ Z \\in \\text{bin }k]``.
+"""
 struct DiscretizedStandardNormalSamples{MH<:MCEBHistogram,
                                        IX<:Union{Nothing, Vector{Int}},
                                        Tvar,

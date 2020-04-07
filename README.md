@@ -1,8 +1,11 @@
-# MinimaxCalibratedEBayes
+# MinimaxCalibratedEBayes.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://nignatiadis.github.io/MinimaxCalibratedEBayes.jl/stable)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://nignatiadis.github.io/MinimaxCalibratedEBayes.jl/dev)
-[![Build Status](https://travis-ci.com/nignatiadis/MinimaxCalibratedEBayes.jl.svg?branch=master)](https://travis-ci.com/nignatiadis/MinimaxCalibratedEBayes.jl)
-[![Build Status](https://ci.appveyor.com/api/projects/status/github/nignatiadis/MinimaxCalibratedEBayes.jl?svg=true)](https://ci.appveyor.com/project/nignatiadis/MinimaxCalibratedEBayes-jl)
-[![Codecov](https://codecov.io/gh/nignatiadis/MinimaxCalibratedEBayes.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/nignatiadis/MinimaxCalibratedEBayes.jl)
-[![Coveralls](https://coveralls.io/repos/github/nignatiadis/MinimaxCalibratedEBayes.jl/badge.svg?branch=master)](https://coveralls.io/github/nignatiadis/MinimaxCalibratedEBayes.jl?branch=master)
+A Julia package for conducting inference on empirical Bayes estimands and linear functionals in
+the Deconvolution model.
+
+The package implements the method described in the following preprint:
+
+  >Ignatiadis, Nikolaos, and Stefan Wager. "Bias-Aware Confidence Intervals for Empirical Bayes Analysis." [arXiv:1902.02774](https://arxiv.org/abs/1902.02774) (2019)
+
+Documentation is available below:  
+[![Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://nignatiadis.github.io/MinimaxCalibratedEBayes.jl/dev)
