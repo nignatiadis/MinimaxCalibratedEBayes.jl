@@ -2,8 +2,21 @@ function DiscretizedAffineEstimator(mhist::MCEBHistogram, kernel::ContinuousUniv
     DiscretizedAffineEstimator(mhist, x->pdf(kernel, x))
 end
 
-
-
+"""
+    SincKernel(h)
+    
+Implements the `SincKernel` with bandwidth `h` to be used for kernel density estimation
+through the `KernelDensity.jl` package. The sinc kernel is defined as follows: 
+```math
+K_{\\text{sinc}}(x) = \\frac{\\sin(x)}{\\pi x} 
+```
+It is not typically used for kernel density estimation, because this kernel is not
+a density itself. However, it is particularly well suited to deconvolution problems
+and estimation of very smooth densities because its Fourier transform is the following:
+```math
+K^*_{\\text{sinc}}(t) = \\mathbf 1( t \\in [-1,1])
+```
+"""
 struct SincKernel <: ContinuousUnivariateDistribution
    h::Float64 #Bandwidth
 end
@@ -21,6 +34,27 @@ function pdf(a::SincKernel, t)
    end
 end
 
+
+
+
+"""
+    DeLaValleePoussinKernel(h)
+    
+Implements the `DeLaValleePoussinKernel` with bandwidth `h` to be used for kernel density estimation
+through the `KernelDensity.jl` package. The De La Vallée-Poussin kernel is defined as follows: 
+```math
+K_V(x) = \\frac{\\cos(x)-\\cos(2x)}{\\pi x^2}
+```
+Its use case is similar to the [`SincKernel`](@ref), however it has the advantage of being integrable
+(in the Lebesgue sense). Its Fourier transform is the following:
+```math
+K^*_V(t) = \\begin{cases} 
+ 1, & \\text{ if } x\\in[-1,1] \\\\ 
+ 0, &\\text{ if } |t| \\geq 2 \\\\ 
+ 2-|t|,& \\text{ if } |t| \\in [1,2]
+ \\end{cases}
+```
+"""
 struct DeLaValleePoussinKernel <: ContinuousUnivariateDistribution
    h::Float64 #Bandwidth
 end
@@ -50,6 +84,31 @@ function pdf(a::DeLaValleePoussinKernel, t)
    end
 end
 
+"""
+    KDEInfinityBandOptions(; kernel=DeLaValleePoussinKernel
+                             bandwidth = nothing,
+                             a_min, 
+                             a_max,
+                             nboot = 1000)
+
+This struct contains hyperparameters that will be used for constructing a neighborhood
+of the marginal density. The steps of the method (and corresponding hyperparameter meanings)
+are as follows
+* First a kernel density estimate ``\\bar{f}`` of the data is fit with `kernel` as the
+kernel and `bandwidth` (the default `bandwidth = nothing` corresponds to automatic
+bandwidth selection).
+* Second, a Poisson bootstrap with `nboot` replication will be used to estimate a ``L_{\\infty}``
+neighborhood ``c_m`` of the true density ``f`` which is such that with probability tending to 1:
+```math
+\\sup_{x \\in [a_{\\text{min}} , a_{\\text{max}}]} | \\bar{f}(x) - f(x)| \\leq c_m
+```
+Note that the bound is valid from `a_min` to `a_max`. 
+
+## Reference:
+  > Paul Deheuvels and Gérard Derzko. Asymptotic certainty bands for kernel density 
+  > estimators based upon a bootstrap resampling scheme. In Statistical models and methods 
+  > for biomedical and technical systems, pages 171–186. Springer, 2008
+"""
 Base.@kwdef struct KDEInfinityBandOptions{T<:Real, 
                                          S<:Union{T, Nothing}}
    a_min::T
@@ -62,7 +121,11 @@ Base.@kwdef struct KDEInfinityBandOptions{T<:Real,
    n_interp::Integer = 25
 end
 
-
+"""
+    KDEInfinityBand
+    
+The result of running `fit()     
+"""
 Base.@kwdef struct KDEInfinityBand{T<:Real}
     C∞::T
     a_min::T

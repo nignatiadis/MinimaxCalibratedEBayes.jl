@@ -1,12 +1,29 @@
 # algorithm type
 struct ButuceaComte end
 
+
+"""
+    ButuceaComteOptions(; bandwidth = :auto)
+    
+The Butucea Comte estimator of linear functional in the deconvolution model. Given a `LinearEBayesTarget`
+with characteristic function ``\\psi^*`` and samples convolved with Gaussian noise (with ``\\phi`` Standard Gaussian pdf),
+it is defined as follows
+ 
+```math
+\\hat{L}_{\\text{BC},h_m} = \\frac{1}{2 \\pi m}\\sum_{i=1}^m \\int_{-1/h_m}^{1/h_m} \\exp(it Z_k) \\frac{\\psi^*(-t)}{\\varphi^*(t)}dt
+```
+``h`` is the bandwidth, the option `:auto` will pick it automatically.
+ 
+## Reference:
+    >Butucea, C. and Comte, F., 2009. 
+    >Adaptive estimation of linear functionals in the convolution model and applications.
+    >Bernoulli, 15(1), pp.69-98.
+"""
 Base.@kwdef struct ButuceaComteOptions{S}
     bandwidth::S = :auto
 end
 
 fit(bcopt::ButuceaComteOptions, Zs) = bcopt #do nothing
-
 
 struct ButuceaComteEstimator{EBT<:LinearEBayesTarget}
     target::EBT
@@ -124,6 +141,11 @@ function DiscretizedAffineEstimator(mhist, cb::ButuceaComteEstimator)
 end
 
 
+""" 
+    estimate(target::LinearEBayesTarget, bcopt::ButuceaComteOptions, Zs)
+                         
+bla
+"""
 function estimate(target::LinearEBayesTarget, bcopt::ButuceaComteOptions, 
                   Zs::AbstractVector{<:StandardNormalSample})
     (bcopt.bandwidth == :auto) || error("only :auto bandwidth for now")
@@ -147,11 +169,6 @@ end
 
 
 
-#pretty_label(cb::ComteButucea)  = "Butucea-Comte"
-
-#inference_target(cb::ComteButucea) = cb.target
-
-#default_bandwidth(::Type{ComteButucea}, target::LFSRNumerator, n) = sqrt(log(n)*2/3)
 
 #default_bandwidth(::Type{ComteButucea}, n) = sqrt(log(n))
 #default_bandwidth(::Type{ComteButucea}, target, n) = default_bandwidth(ComteButucea, n)

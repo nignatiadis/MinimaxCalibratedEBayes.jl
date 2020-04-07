@@ -43,12 +43,13 @@ Let ``t_1 < \\dotsc, < t_K`` the elements of `marginal_grid`, then this
 type implies that we map each sample ``Z \\sim \\mathcal{N}(0,1)`` to one of the intervals
 ``[t_j, t_{j+1}),j=0,\\dotsc,K``, with ``t_0 = -\\infty`` and ``t_{k+1} =  +\\infty``.
  Our inference will depend only on the discretized samples.
+ 
 
 	DiscretizedStandardNormalSamples(Zs::AbstractVector{<:StandardNormalSample}, marginal_grid)
 
 If we also provide the constructor with a vector of `StandardNormalSample`'s, then it also
 stores the Histogram of the samples (according to the binning defined above) in the `mhist` slot. 
-The is a multinomial summarization of the original data.
+This is the multinomial sufficient statistics of the discretized data.
 	
 The `DiscretizedStandardNormalSamples` type also contains three more slots:
 
