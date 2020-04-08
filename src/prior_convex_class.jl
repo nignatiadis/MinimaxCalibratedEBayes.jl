@@ -145,10 +145,27 @@ function worst_case_bias(Q::DiscretizedAffineEstimator,
     max_abs_bias = max(abs(max_bias), abs(min_bias))
 
     (max_abs_bias = max_abs_bias,
-     max_squared_bias = max_abs_bias^2,
+     max_squared_bias = abs2(max_abs_bias),
      max_bias = max_bias, min_bias = min_bias,
      max_g = max_g, min_g = min_g,
      model = model)
+end
+
+# also define this for a single prior
+function worst_case_bias(Q::DiscretizedAffineEstimator,
+                  Z::DiscretizedStandardNormalSamples,
+                  prior::Distribution,
+                  target::LinearEBayesTarget)
+
+    marginal_distr = marginalize(prior, Z)
+    #TODO: define expectation operator for this type of thing?
+    expected_target = Q.Qo + dot(pdf(marginal_distr), Q.Q)
+    L = target(prior)  
+    
+    bias = expected_target - L
+    (max_abs_bias = abs(bias),
+     max_squared_bias = abs2(bias),
+     bias = bias)
 end
 
 
@@ -532,6 +549,10 @@ end
         sme.Q
     end
 	
+    
+    # Important note: In implementation I am doing L(G_2) - L(G_1)
+    # So:     G_2 corresponds to G_1 from the paper
+    #         G_1 corresponds to G_{-1} from the paper
 	@series begin
 		seriestype := :path
 		subplot := 1
@@ -562,7 +583,7 @@ end
         title := "b)"
         xguide := L"\mu"
 		legend := :topright
-        x_grid, [g1_xs g2_xs]
+        x_grid, [g2_xs g1_xs]
     end
 	
 	if (arg_length == 2)
@@ -580,7 +601,7 @@ end
             title := "d)"
 			legend := :topright
             xguide := L"\mu"
-			x_grid, [g1_xs g2_xs]
+			x_grid, [g2_xs g1_xs]
 		end
 	end
 
@@ -605,7 +626,7 @@ end
         title := "c)"
 		legend := :topright
         xguide := L"x"
-        x_grid, [f1_xs f2_xs]
+        x_grid, [f2_xs f1_xs]
     end
 	
 	if (arg_length == 2)
@@ -620,7 +641,7 @@ end
 			subplot := 5
 		    label :=  [L"f_{G_{1}}" L"f_{G_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
 			linecolor --> [col_g1 col_gm1]
-			x_grid, [f1_xs f2_xs]
+			x_grid, [f2_xs f1_xs]
 		end	
         
         @series begin
@@ -650,7 +671,7 @@ end
             title := "e)"
             legend := :topright
             xguide := L"x"
-            x_grid, [f1_xs f2_xs]
+            x_grid, [f2_xs f1_xs]
         end	
 	end
 end
