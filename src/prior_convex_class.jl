@@ -286,9 +286,25 @@ default_δ_min(n, C∞_density) = sqrt( log(n)/n)*C∞_density
 
 
 
-
+""" 
+    DeltaTuner
+   
+Abstract type used to represent ways of picking
+``\\delta`` at which to solve the modulus problem, cf. 
+Manuscript. Different choices of ``\\delta`` correspond
+to different choices of the Bias-Variance tradeoff with
+every choice leading to Pareto-optimal tradeoff. 
+"""    
 abstract type DeltaTuner end
 
+""" 
+    FixedDelta(δ) <: DeltaTuner
+    
+The simplest `DeltaTuner`. It just uses `δ` which has been fixed
+beforehand.  This is used as a component of more complicated
+`DeltaTuner`s which need to run repeatedly for different values
+of `δ`.
+""" 
 struct FixedDelta <: DeltaTuner
     δ::Float64
 end
@@ -317,6 +333,13 @@ function (bv::BiasVarAggregate)(model::JuMP.Model)
     bv(get_bias_var(model)...)
 end
 
+""" 
+    RMSE(n::Integer, δ_min::Float64) <: DeltaTuner
+    
+A `DeltaTuner` that chooses the `δ ≧ δ_min` the optimizes
+the worst-case (root) mean squared error.  Here `n` is the sample
+size used for estimation.
+""" 
 struct RMSE <: BiasVarAggregate
     n::Integer
     δ_min::Float64
@@ -324,6 +347,14 @@ end
 
 (rmse::RMSE)(bias, unit_var_proxy) =  sqrt(bias^2 + unit_var_proxy/rmse.n)
 
+
+""" 
+    HalfCIWidth(n::Integer, α::Float64 δ_min::Float64) <: DeltaTuner
+    
+A `DeltaTuner` that chooses the `δ ≧ δ_min` the optimizes
+the worst-case (root) mean squared error.  Here `n` is the sample
+size used for estimation.
+""" 
 struct HalfCIWidth <: BiasVarAggregate
     n::Integer
     α::Float64

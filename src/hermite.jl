@@ -131,7 +131,10 @@ function pdf(herm_dbn::HermiteQuasiDistribution, x)
 	 dot(hermite_fun.(x, 0:herm_dbn.q), herm_dbn.coefs)
 end
 
-
+function cf(herm_dbn::HermiteQuasiDistribution, t)
+	 cf_coefs = hermite_cf_coefficient.(0:herm_dbn.q)
+	 dot(hermite_fun.(t, 0:herm_dbn.q), herm_dbn.coefs .* cf_coefs)
+end
 
 function marginalize(hermite_dbn::HermiteQuasiDistribution,
                      Zs_discr::DiscretizedStandardNormalSamples)

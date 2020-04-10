@@ -20,21 +20,21 @@ version = "0.11.10"
 
 [[ApproxFunBase]]
 deps = ["AbstractFFTs", "BandedMatrices", "BlockArrays", "BlockBandedMatrices", "Calculus", "DSP", "DomainSets", "DualNumbers", "FFTW", "FastGaussQuadrature", "FillArrays", "InfiniteArrays", "IntervalSets", "LazyArrays", "LinearAlgebra", "LowRankApprox", "SparseArrays", "SpecialFunctions", "StaticArrays", "Statistics", "Test", "ToeplitzMatrices"]
-git-tree-sha1 = "3d9973b41942c2b40886f7585c1cc0b0fed5038b"
+git-tree-sha1 = "73baf3bee1cb7bf680915aacb2c4b2b286b57817"
 uuid = "fbd15aa5-315a-5a7d-a8a4-24992e37be05"
-version = "0.3.2"
+version = "0.3.3"
 
 [[ApproxFunFourier]]
 deps = ["AbstractFFTs", "ApproxFunBase", "DomainSets", "FFTW", "FastTransforms", "InfiniteArrays", "IntervalSets", "LinearAlgebra", "Reexport"]
-git-tree-sha1 = "a6de41ed9db211735736029236098da306fe653e"
+git-tree-sha1 = "8708336edb496bdb75c519628b9983dc985ab572"
 uuid = "59844689-9c9d-51bf-9583-5b794ec66d30"
-version = "0.2.2"
+version = "0.2.3"
 
 [[ApproxFunOrthogonalPolynomials]]
 deps = ["AbstractFFTs", "ApproxFunBase", "BandedMatrices", "BlockArrays", "BlockBandedMatrices", "DomainSets", "FFTW", "FastGaussQuadrature", "FastTransforms", "FillArrays", "IntervalSets", "LinearAlgebra", "Reexport", "SpecialFunctions", "Statistics"]
-git-tree-sha1 = "cccb90b93a0c90f9ce9f510558b9abce35ddb4bb"
+git-tree-sha1 = "25f45488f8312f89c8d5d853f77f25656c512953"
 uuid = "b70543e2-c0d9-56b8-a290-0d4d6d4de211"
-version = "0.3.2"
+version = "0.3.3"
 
 [[ApproxFunSingularities]]
 deps = ["ApproxFunBase", "ApproxFunOrthogonalPolynomials", "DomainSets", "IntervalSets", "LinearAlgebra", "Reexport", "Statistics"]
@@ -56,9 +56,9 @@ version = "3.5.0+3"
 
 [[ArrayInterface]]
 deps = ["LinearAlgebra", "Requires", "SparseArrays"]
-git-tree-sha1 = "c851f4dab787f78ab3389657a0a50c8d3270dd6a"
+git-tree-sha1 = "b34d74dc877e6083c4c5c553a685e89e10ea4662"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "2.8.1"
+version = "2.8.3"
 
 [[ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra"]
@@ -205,9 +205,9 @@ version = "4.0.1"
 
 [[DSP]]
 deps = ["FFTW", "IterTools", "LinearAlgebra", "Polynomials", "Random", "Reexport", "SpecialFunctions", "Statistics"]
-git-tree-sha1 = "e10f3c579404419c172a8aa8d83a12fde99e9964"
+git-tree-sha1 = "aecdff28c8de62744791a92ce95ff5aebac088be"
 uuid = "717857b8-e6f2-59f4-9121-6e50c889abd2"
-version = "0.6.3"
+version = "0.6.4"
 
 [[DataAPI]]
 git-tree-sha1 = "674b67f344687a88310213ddfa8a2b3c76cc4252"

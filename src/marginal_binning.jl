@@ -230,6 +230,12 @@ function (Q::DiscretizedAffineEstimator)(x::StandardNormalSample)
     Q(response(x))
 end
 
+function std_proxy(estimator::DiscretizedAffineEstimator, Zs::DiscretizedStandardNormalSamples, n)
+	first_moment = sum(estimator.Q .* Zs.var_proxy)
+	second_moment = sum(estimator.Q.^2 .* Zs.var_proxy)
+	sqrt(second_moment - first_moment^2)/sqrt(n)
+end 
+
 #  function (calib::DiscretizedAffineEstimator)(x)
 #    idxs = StatsBase.binindex(calib.mhist, x)
 #   calib.Q[idxs] + calib.Qo
