@@ -111,7 +111,7 @@ end
 
 
 
-function ButuceaComteEstimator(target::EBayesTarget; n::Int64)
+function ButuceaComteEstimator(target::EBayesTarget; n::Integer)
     h = default_bandwidth(ButuceaComteEstimator, target, n)
     ButuceaComteEstimator(target, h)
 end

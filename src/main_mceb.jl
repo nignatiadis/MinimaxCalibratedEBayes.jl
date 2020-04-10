@@ -17,14 +17,14 @@
 
 
 """
-    _split_data(n_total::Int64)
+    _split_data(n_total::Integer)
     _split_data(Zs::AbstractVector)
 	_split_data(Zs::AbstractVector, ::Symbol)
 
 Helper functions to partition all observations
 into two disjoint folds. 
 """
-function _split_data(n_total::Int64)
+function _split_data(n_total::Integer)
     n_half = ceil(Int, n_total/2)
     idx_test = sample(1:n_total, n_half, replace=false)
     idx_train = setdiff(1:n_total, idx_test)
