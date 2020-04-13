@@ -10,4 +10,5 @@ The package implements the method described in the following preprint:
 Documentation is available here:  [![Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://nignatiadis.github.io/MinimaxCalibratedEBayes.jl/dev)
 
 Other badges: [![Build Status](https://travis-ci.com/nignatiadis/MinimaxCalibratedEBayes.jl.svg?branch=master)](https://travis-ci.com/nignatiadis/MinimaxCalibratedEBayes.jl)
+[![Build Status](https://ci.appveyor.com/api/projects/status/github/nignatiadis/MinimaxCalibratedEBayes.jl?svg=true)](https://ci.appveyor.com/project/nignatiadis/MinimaxCalibratedEBayes-jl)
 

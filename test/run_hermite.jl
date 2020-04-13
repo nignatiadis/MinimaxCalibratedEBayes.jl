@@ -32,7 +32,6 @@ g_min = herm_worst_case_bias.min_g
 @test cf(g_min, -1.0) ≈ quadgk(x->exp(-im*x)*pdf(g_min,x), -Inf, Inf)[1]
 @test herm_class.sobolev_bound ≈ quadgk(x -> abs2(cf(g_min, x))*(x^2+1), -Inf, Inf)[1]/(2π)
 
-herm_class.sobolev_bound 
 #function _coefs_to_sobolev_norm(αs)
 #	q = length(αs)
 #	αstilde = zeros(q + 1)
@@ -49,9 +48,23 @@ function _coefs_to_sobolev_norm(αs)
 	quad_term = abs2(αs_o[1])/2 + sum(abs2, αs_o)
 	sob_vec = [(sqrt(j)*αs_o[j-1]-sqrt(j+1)*αs_o[j+1]) for j in 1:(q-1)]
 	sob_term = sum(abs2, sob_vec)/2
-	quad_term + sob_term
+	sob_norm = quad_term + sob_term
+	
+	herm_vec = [(sqrt(j/2)*αs_o[j-1]+sqrt((j+1)/2)*αs_o[j+1]) for j in 1:(q-1)]
+	hermite_norm = abs2(αs_o[1])/2 + sum(abs2, herm_vec)
+	joint_norm_bound = sum([ (j*abs2(αs_o[j-1]) + (j+1)*abs2(αs_o[j+1])) for j in 1:(q-1)])
+	joint_norm_bound_diff =  abs2(αs_o[1]) + sum(abs2, αs_o)
+	(sob_norm = sob_norm, hermite_norm=hermite_norm,
+	 joint_norm_bound = joint_norm_bound,
+	 joint_norm_bound_diff = joint_norm_bound_diff)
 end 
+sob_norms = _coefs_to_sobolev_norm(g_min.coefs)
 
-@test _coefs_to_sobolev_norm(g_min.coefs) ≈ herm_class.sobolev_bound atol=0.00001	
+@test sob_norms[:sob_norm] ≈ herm_class.sobolev_bound atol=0.00001	
+@test sob_norms[:hermite_norm] ≈ quadgk(x->abs2(pdf(g_min,x)*x), -Inf,+Inf)[1] atol=0.00001	
+@test sob_norms[:joint_norm_bound] < sob_norms[:hermite_norm] + sob_norms[:sob_norm] 
+
+@test sob_norms[:hermite_norm] + sob_norms[:sob_norm] - sob_norms[:joint_norm_bound] ≈ sob_norms[:joint_norm_bound_diff]
+
 
 end
