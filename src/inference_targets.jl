@@ -199,8 +199,21 @@ end
 
 
 
-#----------- LFSRNumerator ---------------------------------
-# running under assumption X_i >=0...
+"""
+	LFSRNumerator(Z::StandardNormalSample) <: LinearEBayesTarget
+
+## Example call
+```julia
+LFSRNumerator(StandardNormalSample(2.0))
+```
+## Description 		
+Describes the linear functional
+```math
+L(G) =  \\int \\mathbf 1(\\mu \\geq 0) \\phi(z-\\mu) dG(\\mu)
+```
+This is used as an intermediate step in representing the local false sign rate, c.f. [`PosteriorTarget`](@ref)
+and [`LFSR`](@ref).
+"""
 struct LFSRNumerator{NS <: StandardNormalSample} <: LinearEBayesTarget
     Z::NS
 end
@@ -218,6 +231,21 @@ end
 
 #--------- PosteriorMeanNumerator ---------------------------------
 
+"""
+	PosteriorMeanNumerator(Z::StandardNormalSample) <: LinearEBayesTarget
+
+## Example call
+```julia
+PosteriorMeanNumerator(StandardNormalSample(2.0))
+```
+## Description 		
+Describes the linear functional
+```math
+L(G) =  \\int \\mu \\phi(z-\\mu) dG(\\mu)
+```
+This is used as an intermediate step in representing the posterior mean, c.f. [`PosteriorTarget`](@ref)
+and [`PosteriorMean`](@ref)
+"""
 struct PosteriorMeanNumerator{NS <: StandardNormalSample} <: LinearEBayesTarget
     Z::NS
 end
@@ -234,12 +262,44 @@ end
 
 
 #----------------------- Posterior Targets------------------------------------------
-
+"""
+	PosteriorTarget(num_target::LinearEBayesTarget) <: EBayesTarget
+	
+Type for Empirical Bayes estimands that take the form:
+	
+```math
+E_G[h(\\mu) \\mid Z_i = z] = \\frac{ \\int h(\\mu) \\phi(z-\\mu) dG(\\mu)}{\\int \\phi(z-\\mu) dG(\\mu}
+```
+`num_target` is a `LinearEBayesTarget` that represents the numerator of the above estimands, i.e., of
+``L(G)``.
+"""
 struct PosteriorTarget{NT <: LinearEBayesTarget} <: PosteriorEBayesTarget
     num_target::NT
 end
 
+""" 
+	PosteriorMean(Z)
+
+## Example call
+```julia
+PosteriorMean(StandardNormalSample(2.0))
+```
+## Description 	
+Shortcut for `PosteriorTarget(PosteriorMeanNumerator(Z))`, c.f. [`PosteriorMeanNumerator`](@ref)
+"""
 PosteriorMean(Z) = PosteriorTarget(PosteriorMeanNumerator(Z))
+
+
+""" 
+	LFSR(Z)
+
+## Example call
+```julia
+LFSR(StandardNormalSample(2.0))
+```
+## Description 
+Shortcut for `PosteriorTarget(LFSRNumerator(Z))`, c.f. [`LFSRNumerator`](@ref)
+"""
 LFSR(Z) = PosteriorTarget(LFSRNumerator(Z))
 
 location(target::PosteriorTarget) = location(target.num_target)

@@ -69,6 +69,21 @@ end
 
 # train => first fold
 # test -> second fold
+
+
+""" 
+	MinimaxCalibratorSetup(;Zs_test, 
+	                        Zs_train,
+							fkde_train,
+		                    prior_class,
+							Zs_test_discr,
+							delta_tuner,
+						    pilot_method,
+							cache_target)
+							
+
+							
+"""
 mutable struct MinimaxCalibratorSetup{DS <: DiscretizedStandardNormalSamples,
                                            IDX,
 										   ESTR,
@@ -90,6 +105,7 @@ mutable struct MinimaxCalibratorSetup{DS <: DiscretizedStandardNormalSamples,
 	previous_target
 	delta_cached::Float64
 end
+
 
 function MinimaxCalibratorSetup(;Zs_test, 
 	                             prior_class,

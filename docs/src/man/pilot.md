@@ -17,9 +17,7 @@ estimate(target, bcop, Zs)
 Distributions.estimate(::MCEB.LinearEBayesTarget, ::MCEB.ButuceaComteOptions, ::AbstractVector{<:StandardNormalSample})
 ``` 
 
-Note that the Butucea-Comte estimator is a linear estimator, that is it takes the form:
 
 
 
-## Logspline G-modeling
 

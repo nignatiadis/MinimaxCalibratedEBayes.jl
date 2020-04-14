@@ -60,7 +60,7 @@ struct DeLaValleePoussinKernel <: ContinuousUnivariateDistribution
 end
 
 
-_default_bandwidth(a::Type{DeLaValleePoussinKernel}, m::Integer) = 1.5/sqrt(log(m))
+_default_bandwidth(a::Type{DeLaValleePoussinKernel}, m::Integer) = 1/sqrt(log(m))
 
 function DeLaValleePoussinKernel(; m = 1_000)
      DeLaValleePoussinKernel(default_bandwidth(DeLaValleePoussinKernel, m))
@@ -124,7 +124,14 @@ end
 """
     KDEInfinityBand
     
-The result of running `fit()     
+The result of running `StatsBase.fit(opt::KDEInfinityBandOptions, Xs)`. Here `opt` is an instance
+of [`KDEInfinityBandOptions`](@ref) and `Xs` is a vector of samples distributed according to
+a density ```f``.
+
+## Fields:
+* `a_min`,`a_max`, `kernel`: These are the same as the fields in `opt:KDEInfinityBandOptions`.
+* `C∞`: This is the Poisson Bootstrap point estimate of ``\\sup_{x \\in [a_{\\text{min}} , a_{\\text{max}}]} | \\bar{f}(x) - f(x)|``
+* `fitted_kde`: The fitted `KernelDensity` object.
 """
 Base.@kwdef struct KDEInfinityBand{T<:Real}
     C∞::T
@@ -238,9 +245,17 @@ end
     x,y
 end
 
+"""
+    set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
+                          fkde::KDEInfinityBand)
 
+Return a [`DiscretizedStandardNormalSamples`](@ref) instance identical to `Zs_discr` but with 
+`f_min`,`f_max`,`var_proxy` set based on the fit from `fkde`
+(cf.[`KDEInfinityBand`](@ref)).                     
+                          
+"""
 function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
-                          fkde::MinimaxCalibratedEBayes.KDEInfinityBand)
+                          fkde::KDEInfinityBand)
     
     @unpack n_interp, η_infl = fkde 
     grid = Zs_discr.mhist.grid

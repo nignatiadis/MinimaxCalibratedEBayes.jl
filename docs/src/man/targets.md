@@ -46,3 +46,21 @@ PriorTailProbability
 ```
 
 ## Posterior Estimands 
+
+```@docs
+PosteriorTarget
+```
+
+### Posterior mean 
+
+```@docs
+PosteriorMean
+PosteriorMeanNumerator
+```
+
+### Local false sign rate
+
+```@docs 
+LFSR
+LFSRNumerator
+```

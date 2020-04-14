@@ -1,14 +1,11 @@
 # MinimaxCalibratedEBayes.jl
 
-
+Consider $n$ independent samples from the following hierarchical model
 ```math
 \mu \sim G, \ \ Z \sim \mathcal{N}(\mu, \, 1)
 ```
-The ingredients of the approach are the following. #
-* The class of potential effect size distributions $\mathcal{G}$.
-* The estimator of the marginal density $\bar{f}$ and neighborhood radius $c_m$.
-* The choice of $\delta_m$.
-* The pilot estimators for. 
+Here $G$ is an unknown effect size distribution (prior). This package implements confidence intervals for linear functionals $L(G)$ of the unknown distribution $G$, as well as for empirical Bayes estimands of the form $\theta_G(z) = E_G[h(\mu) \mid Z=z]$. 
+
 
 ## Reference
 
@@ -18,8 +15,8 @@ This package implements the method described in the following paper
 
   
 !!! note "A remark on notation"
-      See the paper for details about the method. Note that the paper uses the notation
-      $X_i$ for the Standard Normal Samples, while the documentation and the package
+      See the paper for details about the method. The paper uses the notation
+      $X_i$ for Standard Normal Samples, while the documentation and the package
       here use the notation $Z_i$.
 
 The paper provides a general framework for estimation of empirical Bayes estimands and linear

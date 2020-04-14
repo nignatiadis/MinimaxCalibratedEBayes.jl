@@ -10,14 +10,14 @@ with characteristic function ``\\psi^*`` and samples convolved with Gaussian noi
 it is defined as follows
  
 ```math
-\\hat{L}_{\\text{BC},h_m} = \\frac{1}{2 \\pi m}\\sum_{i=1}^m \\int_{-1/h_m}^{1/h_m} \\exp(it Z_k) \\frac{\\psi^*(-t)}{\\varphi^*(t)}dt
+\\hat{L}_{\\text{BC},h_n} = \\frac{1}{2 \\pi n}\\sum_{i=1}^n \\int_{-1/h_n}^{1/h_n} \\exp(it Z_k) \\frac{\\psi^*(-t)}{\\varphi^*(t)}dt
 ```
 ``h`` is the bandwidth, the option `:auto` will pick it automatically.
  
 ## Reference:
-    >Butucea, C. and Comte, F., 2009. 
-    >Adaptive estimation of linear functionals in the convolution model and applications.
-    >Bernoulli, 15(1), pp.69-98.
+  >Butucea, C. and Comte, F., 2009. 
+  >Adaptive estimation of linear functionals in the convolution model and applications.
+  >Bernoulli, 15(1), pp.69-98.
 """
 Base.@kwdef struct ButuceaComteOptions{S}
     bandwidth::S = :auto

@@ -418,7 +418,12 @@ function worst_case_bias(sme::SteinMinimaxEstimator)
     sme.max_bias
 end
 
-
+"""
+    SteinMinimaxEstimator(Zs_discr::DiscretizedStandardNormalSamples,
+                          prior_class::ConvexPriorClass,
+                          target::LinearEBayesTarget,
+                          δ_tuner::DeltaTuner
+"""
 function SteinMinimaxEstimator(Zs_discr::DiscretizedStandardNormalSamples,
                                gmix::ConvexPriorClass,
                                target::LinearEBayesTarget,

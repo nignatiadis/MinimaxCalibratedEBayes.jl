@@ -38,6 +38,12 @@ midpoints(mh::MCEBHistogram) = midpoints(mh.grid)
 """
 	DiscretizedStandardNormalSamples(marginal_grid)
 
+## Example usage:
+```julia
+DiscretizedStandardNormalSamples(-5:0.1:5)
+```
+
+## Description
 This type represents discretization of Standard Normal Samples to the grid `marginal_grid`.
 Let ``t_1 < \\dotsc, < t_K`` the elements of `marginal_grid`, then this
 type implies that we map each sample ``Z \\sim \\mathcal{N}(0,1)`` to one of the intervals
@@ -129,6 +135,19 @@ end
 
 
 # TODO: a lot of overlap with code for set_neighborhood based on KDE
+"""
+	set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
+                     prior::Distribution;
+				     C∞ = Inf)
+				
+This function is useful for demonstration and simulations. 
+
+It returnss a [`DiscretizedStandardNormalSamples`](@ref) instance identical to `Zs_discr` but with 
+`f_min`,`f_max`,`var_proxy` set as follows. `prior`, i.e. ``G`` is assumed to be the ground truth
+generating the true effect sizes ``\\mu_i`` and so `var_proxy` corresponds to the marginal
+density ``\\phi \\star G``. `f_min` and `f_max` correspond to ``\\phi \\star G \\pm C_{\\infty}``.
+
+"""
 function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
                           prior::Distribution;
 						  C∞ = Inf,
