@@ -24,11 +24,15 @@ makedocs(;
 )
 
 if get(ENV, "CI", nothing) == "true"
-    mkpath("build/tutorials")
-    tutorial_names = ["linear_estimation.jl"; "data_analysis.jl"]
-    in_path_names = joinpath.("tutorials", tutorial_names)
-    out_path_names = joinpath.("build/tutorials",tutorial_names)
-    cp.(in_path_names, out_path_names)
+    let start_dir = pwd()
+        cd(@__DIR__)
+        mkpath("build/tutorials")
+        tutorial_names = ["linear_estimation.html"; "data_analysis.html"]
+        in_path_names = joinpath.("tutorials", tutorial_names)
+        out_path_names = joinpath.("build/tutorials",tutorial_names)
+        cp.(in_path_names, out_path_names, force=true)
+        cd(start_dir)
+    end
 end
  
 deploydocs(;
