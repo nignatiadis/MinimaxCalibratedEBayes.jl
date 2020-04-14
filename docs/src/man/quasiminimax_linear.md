@@ -6,7 +6,7 @@ $$\min_{Q_0,Q} \left\{ \sup_{ G \in \mathcal{G}} \{ (Q_0 + E_{G}[Q(Z_i)] - L(G))
 
 We solve this over all functions $Q(\cdot)$ that are piecewise constant on $I_k$. This corresponds to finding the linear estimator:
 
-$$\hat{L} = Q_0 + \frac{1}{n} \sum_{i=1}^n Q(X_i)$$
+$$\hat{L} = Q_0 + \frac{1}{n} \sum_{i=1}^n Q(Z_i)$$
 
 that solves a worst-case bias-variance problem, where the exact trade-off is parametrized
 by $\lambda(\delta)$.
@@ -24,8 +24,17 @@ SteinMinimaxEstimator
 
 ## Bias-variance tradeoff 
 
+The following options are available for navigating the bias-variance tradeoff:
 ```@docs
 MCEB.FixedDelta
 MCEB.RMSE
 MCEB.HalfCIWidth
+```
+
+
+## Worst case bias
+
+The worst-case bias of an arbitrary linear estimator can be computed with the following function:
+```@docs
+worst_case_bias
 ```

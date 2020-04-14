@@ -88,6 +88,7 @@ fix_πs(::ConvexPriorClass, πs) = πs
 # want to map: probs ->
 
 
+
 function worst_case_bias(general_Q,
                   Z::DiscretizedStandardNormalSamples,
                   gmix_class::ConvexPriorClass,
@@ -98,6 +99,16 @@ function worst_case_bias(general_Q,
      worst_case_bias(tmpcalib, Z, gmix_class, target; boundary_mass=boundary_mass)
 end
 
+"""
+    worst_case_bias(Q,
+                    Zs_discr::DiscretizedStandardNormalSamples,
+                    prior_class::ConvexPriorClass,
+                    target::LinearEBayesTarget)
+                          
+Computes the worst-case positive and negative bias of the linear estimator `Q` for 
+estimating the linear functional `target` over `prior_class` based on 
+[`DiscretizedStandardNormalSamples`](@ref) `Zs_discr`.                                          
+"""
 function worst_case_bias(Q::DiscretizedAffineEstimator,
                   Z::DiscretizedStandardNormalSamples,
                   prior_class::ConvexPriorClass,
@@ -423,6 +434,10 @@ end
                           prior_class::ConvexPriorClass,
                           target::LinearEBayesTarget,
                           δ_tuner::DeltaTuner
+                          
+Computes a linear estimator optimizing a worst-case bias-variance tradeoff (specified by `δ_tuner`)
+for estimating a linear `target` over `prior_class` based on [`DiscretizedStandardNormalSamples`](@ref)
+`Zs_discr`.                                          
 """
 function SteinMinimaxEstimator(Zs_discr::DiscretizedStandardNormalSamples,
                                gmix::ConvexPriorClass,

@@ -15,6 +15,7 @@ makedocs(;
             "man/pilot.md",
             "man/quasiminimax_linear.md",
             "man/inference.md"],
+         "Tutorials" => "tutorials.md",
     ],
     repo="https://github.com/nignatiadis/MinimaxCalibratedEBayes.jl/blob/{commit}{path}#L{line}",
     sitename="MinimaxCalibratedEBayes.jl",
