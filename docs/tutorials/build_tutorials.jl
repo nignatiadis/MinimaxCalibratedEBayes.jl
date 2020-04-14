@@ -24,3 +24,4 @@ tmp_dir = @__DIR__
 
 
 literateweave(joinpath(tmp_dir,"linear_estimation.jl"), out_path=tmp_dir)
+literateweave(joinpath(tmp_dir,"data_analysis.jl"), out_path=tmp_dir)

@@ -963,12 +963,14 @@ PriorDensityTarget&#40;0.0&#41;
 
 
 <pre class='hljl'>
-<span class='hljl-n'>prior_dbn_normal</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>Normal</span><span class='hljl-p'>(</span><span class='hljl-ni'>0</span><span class='hljl-p'>,</span><span class='hljl-t'> </span><span class='hljl-ni'>2</span><span class='hljl-p'>)</span>
+<span class='hljl-n'>prior_dbn_normal</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>Normal</span><span class='hljl-p'>(</span><span class='hljl-ni'>0</span><span class='hljl-p'>,</span><span class='hljl-t'> </span><span class='hljl-ni'>2</span><span class='hljl-p'>)</span><span class='hljl-t'>
+
+</span><span class='hljl-nf'>marginalize</span><span class='hljl-p'>(</span><span class='hljl-n'>prior_dbn_normal</span><span class='hljl-p'>,</span><span class='hljl-t'> </span><span class='hljl-nf'>StandardNormalSample</span><span class='hljl-p'>(</span><span class='hljl-nfB'>0.0</span><span class='hljl-p'>))</span>
 </pre>
 
 
 <pre class="output">
-Normal&#123;Float64&#125;&#40;μ&#61;0.0, σ&#61;2.0&#41;
+Normal&#123;Float64&#125;&#40;μ&#61;0.0, σ&#61;2.23606797749979&#41;
 </pre>
 
 
@@ -976,14 +978,13 @@ Normal&#123;Float64&#125;&#40;μ&#61;0.0, σ&#61;2.0&#41;
 
 
 <pre class='hljl'>
-<span class='hljl-nf'>marginalize</span><span class='hljl-p'>(</span><span class='hljl-n'>prior_dbn_normal</span><span class='hljl-p'>,</span><span class='hljl-t'> </span><span class='hljl-nf'>StandardNormalSample</span><span class='hljl-p'>(</span><span class='hljl-nfB'>0.0</span><span class='hljl-p'>))</span><span class='hljl-t'>
-</span><span class='hljl-n'>Zs_discr_var_normal</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nd'>@set</span><span class='hljl-t'> </span><span class='hljl-n'>Zs_discr</span><span class='hljl-oB'>.</span><span class='hljl-n'>var_proxy</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>pdf</span><span class='hljl-p'>(</span><span class='hljl-nf'>marginalize</span><span class='hljl-p'>(</span><span class='hljl-n'>prior_dbn_normal</span><span class='hljl-p'>,</span><span class='hljl-t'> </span><span class='hljl-n'>Zs_discr</span><span class='hljl-p'>));</span><span class='hljl-t'>
+<span class='hljl-n'>Zs_discr_var_normal</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nd'>@set</span><span class='hljl-t'> </span><span class='hljl-n'>Zs_discr</span><span class='hljl-oB'>.</span><span class='hljl-n'>var_proxy</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>pdf</span><span class='hljl-p'>(</span><span class='hljl-nf'>marginalize</span><span class='hljl-p'>(</span><span class='hljl-n'>prior_dbn_normal</span><span class='hljl-p'>,</span><span class='hljl-t'> </span><span class='hljl-n'>Zs_discr</span><span class='hljl-p'>));</span><span class='hljl-t'>
 </span><span class='hljl-n'>Zs_discr_nbhood_normal</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>set_neighborhood</span><span class='hljl-p'>(</span><span class='hljl-n'>Zs_discr</span><span class='hljl-p'>,</span><span class='hljl-t'> </span><span class='hljl-n'>prior_dbn_normal</span><span class='hljl-p'>;</span><span class='hljl-t'> </span><span class='hljl-n'>C∞</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-n'>C∞</span><span class='hljl-p'>);</span>
 </pre>
 
 
 
-<p>We now compute the minimxa linear estimators &#40;without and with localization&#41;:</p>
+<p>We now compute the minimax linear estimators &#40;without and with localization&#41;:</p>
 
 
 <pre class='hljl'>

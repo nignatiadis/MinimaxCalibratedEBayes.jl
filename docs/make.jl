@@ -23,6 +23,14 @@ makedocs(;
     assets=String[],
 )
 
+if get(ENV, "CI", nothing) == "true"
+    mkdir("build/tutorials")
+    tutorial_names = ["linear_estimation.jl"; "data_analysis.jl"]
+    in_path_names = joinpath.("tutorials", tutorial_names)
+    out_path_names = joinpath.("build/tutorials",tutorial_names)
+    cp.(in_path_names, out_path_names)
+end
+ 
 deploydocs(;
     repo="github.com/nignatiadis/MinimaxCalibratedEBayes.jl",
 )

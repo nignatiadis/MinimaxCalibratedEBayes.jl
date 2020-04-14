@@ -157,12 +157,14 @@ hmclass = MCEB.HermitePriorClass(qmax=90, sobolev_order=2, sobolev_bound=0.5,
 # Finally, we will also use a different ground truth $G$
 prior_dbn_normal = Normal(0, 2)
 
-# Let us compute again the marginal (discretized) distribution implies by prior_dbn_normal
 marginalize(prior_dbn_normal, StandardNormalSample(0.0))
+
+
+# Let us compute again the marginal (discretized) distribution implies by prior_dbn_normal
 Zs_discr_var_normal = @set Zs_discr.var_proxy = pdf(marginalize(prior_dbn_normal, Zs_discr));
 Zs_discr_nbhood_normal = set_neighborhood(Zs_discr, prior_dbn_normal; C∞ = C∞);
 
-# We now compute the minimxa linear estimators (without and with localization):
+# We now compute the minimax linear estimators (without and with localization):
 
 prior_density_fit = SteinMinimaxEstimator(Zs_discr_var_normal, hmclass,
 								          prior_density_target, MCEB.RMSE(n_prior_density,0.0));
