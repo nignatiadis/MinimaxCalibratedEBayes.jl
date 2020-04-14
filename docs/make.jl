@@ -24,7 +24,7 @@ makedocs(;
 )
 
 if get(ENV, "CI", nothing) == "true"
-    mkdir("build/tutorials")
+    mkpath("build/tutorials")
     tutorial_names = ["linear_estimation.jl"; "data_analysis.jl"]
     in_path_names = joinpath.("tutorials", tutorial_names)
     out_path_names = joinpath.("build/tutorials",tutorial_names)
