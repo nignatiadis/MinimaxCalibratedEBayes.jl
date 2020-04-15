@@ -600,18 +600,18 @@ end
 	col_g1 = RGB(77/255,137/255,193/255)
 	col_gm1 = RGB(73/255,2/255,53/255)
 	col_band = "#F6CD7F"#RGB(243/255,232/255,176/255)
-	fg_legend --> :transparent
-	bg_legend --> :transparent
+	foreground_color_legend --> :transparent
+	background_color_legend --> :transparent
 
     @series begin
         seriestype := :path
         subplot := 1
 		linestyle := :dash
 		if !isnothing(ylim_calibrator)
-			ylim := ylim_calibrator
+			ylims := ylim_calibrator
 		end
-        xlim := extrema(x_grid)
-	    color := RGB(205/255,84/255,150/255)	# RGB(68/255,60/255,145/255)
+        xlims := extrema(x_grid)
+	    seriescolor := RGB(205/255,84/255,150/255)	# RGB(68/255,60/255,145/255)
 		label := "Minimax"
         sme.Q
     end
@@ -624,8 +624,8 @@ end
 		seriestype := :path
 		subplot := 1
 		linestyle := :solid
-		color := RGB(132/255,193/255,216/255)	
-		xlim := extrema(x_grid)
+		seriescolor := RGB(132/255,193/255,216/255)	
+		xlims:= extrema(x_grid)
 	    label := L"Minimax-$\infty$"
         title := "a)"
 		legend := :topright
@@ -645,8 +645,8 @@ end
         subplot := 2
         linecolor := [col_g1 col_gm1]
         label :=  [L"g_1" L"g_{-1}"]
-        xlim := extrema(x_grid)
-		ylim := (0, ylim_prior)
+        xlims := extrema(x_grid)
+		ylims := (0, ylim_prior)
         title := "b)"
         xguide := L"\mu"
 		legend := :topright
@@ -663,8 +663,8 @@ end
 			subplot := 4
 			linecolor := [col_g1 col_gm1]
 			label :=  [L"g_1" L"g_{-1}"]
-            xlim := extrema(x_grid)
-			ylim := (0, maximum([g1_xs;g2_xs])*ylim_relative_offset)
+            xlims := extrema(x_grid)
+			ylims := (0, maximum([g1_xs;g2_xs])*ylim_relative_offset)
             title := "d)"
 			legend := :topright
             xguide := L"\mu"
@@ -686,10 +686,11 @@ end
     @series begin
         seriestype := :path
         subplot := 3
-        xlim := extrema(x_grid)
+        #bottom_margin := Plots.Measures.Length(:mm,5.0)
+        xlims := extrema(x_grid)
 		label :=  [L"f_{G_{1}}" L"f_{G_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
         linecolor --> [col_g1 col_gm1]
-		ylim --> (0, ylim_marginal)
+		ylims --> (0, ylim_marginal)
         title := "c)"
 		legend := :topright
         xguide := L"x"
@@ -702,45 +703,58 @@ end
 
 		f1_xs=pdf.(f1_band, x_grid)
 		f2_xs=pdf.(f2_band, x_grid)
+        
+        xs_mid = midpoints(sme_band.Z.mhist.grid)
+        h = step(sme_band.Z.mhist.grid)
+        ys_lower = sme_band.Z.f_min[2:(end-1)] ./ h
+        ys_upper = sme_band.Z.f_max[2:(end-1)] ./ h
 
-		@series begin
-			seriestype := :path
-			subplot := 5
-		    label :=  [L"f_{G_{1}}" L"f_{G_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
-			linecolor --> [col_g1 col_gm1]
-			x_grid, [f2_xs f1_xs]
-		end	
-        
+		#@series begin
+		#	seriestype := :path
+		#	subplot := 5
+		 #   label :=  [L"f_{G_{1}}" L"f_{G_{-1}}"]#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
+		#	linecolor := [col_g1 col_gm1]
+		#	x_grid, [f2_xs f1_xs]
+		#end	
         @series begin
-            subplot := 5
-            xs = midpoints(sme_band.Z.mhist.grid)
-            h = step(sme_band.Z.mhist.grid)
-            ys_lower = sme_band.Z.f_min[2:(end-1)] ./ h
-            ys_upper = sme_band.Z.f_max[2:(end-1)] ./ h
+            seriestype := :path 
+             subplot := 5
             # hack for now 
-            fillrange := ys_upper
-            color := col_band
-            label := L"$\infty$-band"
-            xs, ys_lower
+             fillalpha := 1
+             x := xs_mid
+             y := ys_upper
+             fillrange := ys_lower
+             seriescolor := col_band
+             label := L"$\infty$-band"
+             ()
         end	
         
         @series begin
-            seriestype := :path
-            subplot := 5
-            label :=  nothing#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
-            linecolor --> [col_g1 col_gm1]
-            if isnothing(ylim_panel_e)
-                ylim := (0, ylim_marginal)
-            else 
-                ylim := ylim_panel_e
-            end
-            xlim := extrema(x_grid)
-            title := "e)"
-            legend := :topright
-            xguide := L"x"
-            x_grid, [f2_xs f1_xs]
-        end	
-	end
+        	seriestype := :path
+        	subplot := 5
+            label :=  L"f_{G_{1}}"#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
+         	linecolor := col_g1
+        	x_grid, f2_xs
+        end
+        
+        @series begin
+          seriestype := :path
+          subplot := 5
+          if isnothing(ylim_panel_e)
+             ylims := (0, ylim_marginal)
+          else 
+             ylims := ylim_panel_e
+          end
+          xlims := extrema(x_grid)
+          title := "e)"
+          #title_location := :left
+          legend := :topright
+          xguide := L"x"
+          label := L"f_{G_{-1}}"#[L"\varphi  \star g_1" L"\varphi \star g_{-1} "]
+          linecolor := col_gm1
+          x_grid, f1_xs
+        end
+    end
 end
 
 

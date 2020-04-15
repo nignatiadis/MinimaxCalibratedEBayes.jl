@@ -105,7 +105,6 @@ bc_marginal = MCEB.ButuceaComteEstimator(marginal_target;  n=n_marginal);
 # densities. This is Figure 3 in the manuscript.
 
 
-
 marginal_density_affine = steinminimaxplot(marginal_fit, marginal_fit_nbhood; size=def_size,
 									                   ylim_relative_offset=1.4)
 plot!(marginal_density_affine[1], marginal_grid, bc_marginal.(marginal_grid), 
