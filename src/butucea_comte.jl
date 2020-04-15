@@ -144,7 +144,8 @@ end
 """ 
     estimate(target::LinearEBayesTarget, bcopt::ButuceaComteOptions, Zs)
                          
-bla
+Estimate `target` based on samples `Zs` with the Butucea-Comte estimator with 
+[`ButuceaComteOptions`](@ref) bcopt.
 """
 function estimate(target::LinearEBayesTarget, bcopt::ButuceaComteOptions, 
                   Zs::AbstractVector{<:StandardNormalSample})

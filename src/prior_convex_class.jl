@@ -511,6 +511,22 @@ end
 
 
 target_bias_std(target::EBayesTarget, model, Zs; kwargs...) = target_bias_std(target, model; kwargs...)
+
+"""
+    StatsBase.confint(target::EBayesTarget, estimator, Zs; 
+					  level = 0.9, clip = true)
+                           
+Construct confidence intervals for `target` based on samples `Zs`
+with the estimator `estimator`. The nominal coverage is set to `level`. If `clip=true` (Default)
+and `target` is bounded (say in ``[0,1]``), then the confidence intervals are clipped so 
+as to  satisfy these bounds.
+
+Some of the estimators have already been fitted on the `Zs`, so that the following
+call is also possible:
+
+    StatsBase.confint(target::EBayesTarget, estimator; 
+                      level = 0.9, clip = true)
+"""                                                
 confint(target::EBayesTarget, model, Zs; kwargs...) = confint(target, model; kwargs...)
 
 function target_bias_std(target::EBayesTarget, 

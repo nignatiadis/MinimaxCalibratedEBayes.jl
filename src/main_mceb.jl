@@ -73,16 +73,29 @@ end
 
 """ 
 	MinimaxCalibratorSetup(;Zs_test, 
-	                        Zs_train,
-							fkde_train,
-		                    prior_class,
-							Zs_test_discr,
-							delta_tuner,
-						    pilot_method,
-							cache_target)
-							
+                           Zs_train,
+                           fkde_train,
+                           prior_class,
+                           Zs_test_discr,
+                           delta_tuner,
+                           pilot_method,
+                           cache_target)
 
-							
+## Description:							
+This creates the object that holds all preliminary calculations necessary to conduct
+inference for empirical Bayes estimands. It can be either constructed manually, or more typically
+through `fit(opt::MinimaxCalibratorOptions, Zs)` where `Zs` comprises all the data and `opt`
+is a [`MinimaxCalibratorOptions`](@ref) object. See `data_analysis.html` for examples of
+both approaches. 
+
+## Arguments:
+* `Zs_test`: Samples in the second data fold.
+* `Zs_train`: Samples in the first data fold.
+* `fkde_train`: A [`KDEInfinityBand`](@ref) instance computed based on `Zs_train` or external data (but not `Zs_test`).	
+* `Zs_test_discr`: A discretization of `Zs_test` into [`DiscretizedStandardNormalSamples`](@ref).
+* `delta_tuner`: Specifies how the bias-variance tradeoff (i.e., ``\\delta``) will be navigated, for example [`RMSE`](@ref) or [`HalfCIWidth`](@ref).
+* `pilot_method`: Method for computing the pilot estimator for the numerator and denominator of the empirical Bayes estimand. Should support the interface `estimate(target::LinearEBayesTarget, pilot_method, Zs_train)`.
+* `cache_target`: Defaults to `false`. Setting it to `true` will speed up computations when multiple similar targets are being estimated (e.g., PosteriorMeans along a grid).						 							
 """
 mutable struct MinimaxCalibratorSetup{DS <: DiscretizedStandardNormalSamples,
                                            IDX,
@@ -148,6 +161,14 @@ function StatsBase.fit(mceb_setup::MinimaxCalibratorSetup, target::LinearEBayesT
 end
 
 
+""" 
+	CalibratedMinimaxEstimator(target::PosteriorTarget, sme::SteinMinimaxEstimator,
+	                           pilot, pilot_num pilot_denom)
+
+Object that stores a `pilot` estimator (including both the numerator `pilot_num`
+and the denominator `pilot_denom`, where `pilot = pilot_num/pilot_denom`), as well
+the quasi-minimax estimator for the calibrated target.	
+"""
 Base.@kwdef struct CalibratedMinimaxEstimator{T<:PosteriorTarget,
 	                                          SME<:SteinMinimaxEstimator,
 											  S<:Real}
@@ -223,7 +244,26 @@ function target_bias_std(target::PosteriorTarget,
 end
 
 
+""" 
+	MinimaxCalibratorOptions(split = :random
+	                         prior_class::ConvexPriorClass,
+	                         marginal_grid,
+	                         infinity_band_options,
+	                         pilot_options,
+	                         tuner = HalfCIWidth
+	                         cache_target = false)
+							 
+Struct that wraps all options required to automatically
+create a [`MinimaxCalibratorSetup`](@ref) object. The options are as follows
 
+* `split`: Defaults to `:random`, i.e., a random 50-50 split of the data.
+* `prior_class`: A [`ConvexPriorClass`](@ref) in which the true ``G`` is believed to lie.
+* `marginal_grid`: Marginal domain discretization grid.
+* `infinity_band_options`: Options for constructing the localization, cf. [`KDKDEInfinityBandOptions`](@ref).
+* `pilot_options`: 	Options that describe how to derive the pilot estimators, for example [`ButuceaComteOptions`](@ref).
+* `tuner`: Specifies how the bias-variance tradeoff (i.e., ``\\delta``) will be navigated, for example [`RMSE`](@ref) or [`HalfCIWidth`](@ref).
+* `cache_target`: Defaults to `false`. Setting it to `true` will speed up computations when multiple similar targets are being estimated (e.g., PosteriorMeans along a grid).						 							
+"""
 Base.@kwdef struct MinimaxCalibratorOptions{SPL,
                                      GCAL <: ConvexPriorClass,
 									 GR <: AbstractVector,
