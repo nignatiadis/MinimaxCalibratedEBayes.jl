@@ -17,8 +17,8 @@ using LaTeXStrings
 using LinearAlgebra
 using MathOptInterface
 using Optim
-using OrthogonalPolynomialsQuasi
-using OscillatoryIntegrals
+#using OrthogonalPolynomialsQuasi
+#using OscillatoryIntegrals
 using Parameters
 using Plots
 using RecipesBase
@@ -67,11 +67,11 @@ include("inference_targets.jl")
 include("normal_rules.jl")
 include("marginal_kde.jl")
 include("logspline_g_new.jl")
-include("butucea_comte.jl")
+#include("butucea_comte.jl")
 include("prior_convex_class.jl")
 include("sinkhorn.jl")
 include("npmle.jl")
-include("hermite.jl")
+#include("hermite.jl")
 include("main_mceb.jl")
 include("load_datasets.jl")
 include("helper_plots.jl")
@@ -95,10 +95,8 @@ export MCEBHistogram,
        PosteriorMeanNumerator,
        LFSRNumerator,
        PosteriorMean,
-       LFSR,
-       ButuceaComte,
-       GaussianMixturePriorClass,
-	   HermitePriorClass,
+       LFSR, #ButuceaComte,
+       GaussianMixturePriorClass,# HermitePriorClass,
        worst_case_bias,
        SteinMinimaxEstimator,
        steinminimaxplot,
