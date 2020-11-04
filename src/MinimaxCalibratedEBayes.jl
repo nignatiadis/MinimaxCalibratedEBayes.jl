@@ -27,20 +27,19 @@ using KernelDensity
 #using OscillatoryIntegrals
 #using Parameters
 #using Plots
-#using RecipesBase
+using RecipesBase
 using Roots
 using Setfield
 #using SpecialFunctions:erfi
 #using QuadGK
 
-#import StatsBase:confint,
-#				 fit,
+using StatsBase
 #                Histogram,
 #                 binindex,
 #                 midpoints,
 #				 nobs,
 #                 response
-
+using UnPack
 #import Statistics:var
 
 #import Distributions:cf,
