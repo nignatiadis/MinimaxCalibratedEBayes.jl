@@ -21,7 +21,7 @@ using MathOptInterface
 
 using KernelDensity
 #using LaTeXStrings
-#using LinearAlgebra
+using LinearAlgebra
 #using Optim
 #using OrthogonalPolynomialsQuasi
 #using OscillatoryIntegrals
@@ -70,6 +70,7 @@ using UnPack
 include("load_datasets.jl")
 include("target_ci.jl")
 include("neighborhood_worst_case.jl")
+include("local_linear_minimax.jl")
 
 export NeighborhoodWorstCase
 

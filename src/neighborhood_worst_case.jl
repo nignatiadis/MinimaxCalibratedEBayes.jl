@@ -43,7 +43,7 @@ function Base.show(io::IO, ci::LowerUpperConfidenceInterval)
     print(io, "  (", ci.target,")")
 end
 
-@recipe function f(bands=AbstractVector{<:LowerUpperConfidenceInterval})
+@recipe function f(bands::AbstractVector{<:LowerUpperConfidenceInterval})
 	x = [Float64(location(band.target)) for band in bands]
     lower = getproperty.(bands, :lower)
     upper = getproperty.(bands, :upper)
@@ -120,30 +120,50 @@ end
 
 
 function StatsBase.fit(method::NeighborhoodWorstCase{<:Empirikos.FittedEBayesNeighborhood},
-    Zs,
-    targets::Union{<:Empirikos.AbstractPosteriorTarget, AbstractVector{<:Empirikos.LinearEBayesTarget}})
+    target::Empirikos.LinearEBayesTarget)
 
     lp = Model(method.solver)
     g = Empirikos.prior_variable!(lp, method.convexclass)
 
     Empirikos.neighborhood_constraint!(lp, method.neighborhood, g)
 
-    confints = Vector{LowerUpperConfidenceInterval}(undef, length(targets))
+    fitted_worst_case = FittedNeighborhoodWorstCase(method=method,
+        model=lp,
+        gmodel=g,
+        target=target)
 
-    for (index,target) in enumerate(targets)
-        target_g = target(g)
-
-        @objective(lp, Min, target_g)
-        optimize!(lp)
-        _min = objective_value(lp)
-        @objective(lp, Max, target_g)
-        optimize!(lp)
-        _max = objective_value(lp)
-
-        confints[index] = LowerUpperConfidenceInterval(target=target, lower=_min, upper=_max)
-    end
-    confints
+    StatsBase.fit(fitted_worst_case, target)
 end
+
+function StatsBase.fit(method::FittedNeighborhoodWorstCase{<:Empirikos.LinearEBayesTarget},
+                       target::Empirikos.LinearEBayesTarget)
+
+    g = method.gmodel
+    lp = method.model
+
+    target_g = target(g)
+
+    @objective(lp, Min, target_g)
+    optimize!(lp)
+    _min = objective_value(lp)
+    g1 = g(JuMP.value.(g.finite_param))
+
+    @objective(lp, Max, target_g)
+    optimize!(lp)
+    _max = objective_value(lp)
+    g2 = g(JuMP.value.(g.finite_param))
+
+    FittedNeighborhoodWorstCase(method=method.method,
+        target=target,
+        model=lp,
+        gmodel=g,
+        g1=g1,
+        g2=g2,
+        lower=_min,
+        upper=_max)
+end
+
+
 
 
 
