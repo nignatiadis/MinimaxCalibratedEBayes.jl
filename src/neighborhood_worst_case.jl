@@ -8,9 +8,6 @@ function Empirikos.nominal_alpha(nbhood::NeighborhoodWorstCase)
     Empirikos.nominal_alpha(nbhood.neighborhood)
 end
 
-function Empirikos.set_nominal_alpha(nbhood::NeighborhoodWorstCase; kwargs...)
-    @set nbhood.neighborhood =  Empirikos.set_nominal_alpha(nbhood.neighborhood; kwargs...)
-end
 
 Base.@kwdef struct FittedNeighborhoodWorstCase{T, NW<:NeighborhoodWorstCase, M, P, V}
     method::NW
@@ -23,50 +20,15 @@ Base.@kwdef struct FittedNeighborhoodWorstCase{T, NW<:NeighborhoodWorstCase, M, 
     upper::Float64 = +Inf
 end
 
-#
-# Confidence Interval Tools
-#
-# LowerUpperConfidenceInterval
-Base.@kwdef struct LowerUpperConfidenceInterval{T,M}
-    lower::Float64
-    upper::Float64
-    α::Float64 = 0.05
-    estimate::Float64 = (lower + upper)/2
-    target::T = nothing
-    method::M = nothing
-end
 
-function Base.show(io::IO, ci::LowerUpperConfidenceInterval)
-    print(io, "lower = ", round(ci.lower,sigdigits=4))
-    print(io, ", upper = ", round(ci.upper,sigdigits=4))
-    print(io, ", α = ", ci.α)
-    print(io, "  (", ci.target,")")
-end
 
-@recipe function f(bands::AbstractVector{<:LowerUpperConfidenceInterval})
-	x = [Float64(location(band.target)) for band in bands]
-    lower = getproperty.(bands, :lower)
-    upper = getproperty.(bands, :upper)
-    estimate = getproperty.(bands, :estimate)
+function StatsBase.fit(method::NeighborhoodWorstCase, target, Zs; kwargs...)
+    Zs = Empirikos.summarize_by_default(Zs) ? summarize(Zs) : Zs
+    method = Empirikos.set_defaults(method, Zs; kwargs...)
 
-	background_color_legend --> :transparent
-	foreground_color_legend --> :transparent
-    grid --> nothing
-
-	cis_ribbon  = estimate .- lower, upper .- estimate
-	fillalpha --> 0.36
-	seriescolor --> "#018AC4"
-	ribbon --> cis_ribbon
-    linealpha --> 0
-    framestyle --> :box
-    legend --> :topleft
-	label --> "95\\% CI"
-	x, estimate
-end
-
-function StatsBase.fit(method::NeighborhoodWorstCase{<:Empirikos.EBayesNeighborhood}, target, Zs)
     fitted_nbhood = StatsBase.fit(method.neighborhood, Zs)
     method = @set method.neighborhood = fitted_nbhood
+
     StatsBase.fit(method, target)
 end
 
@@ -162,9 +124,6 @@ function StatsBase.fit(method::FittedNeighborhoodWorstCase{<:Empirikos.LinearEBa
         lower=_min,
         upper=_max)
 end
-
-
-
 
 
 

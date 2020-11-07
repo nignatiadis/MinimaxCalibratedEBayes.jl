@@ -1,3 +1,5 @@
+abstract type InfiniteOrderKernel <: ContinuousUnivariateDistribution end
+
 """
     SincKernel(h)
 
@@ -13,12 +15,19 @@ and estimation of very smooth densities because its Fourier transform is the fol
 K^*_{\\text{sinc}}(t) = \\mathbf 1( t \\in [-1,1])
 ```
 """
-struct SincKernel <: ContinuousUnivariateDistribution
-   h::Float64 #Bandwidth
+struct SincKernel{H} <: InfiniteOrderKernel
+   h::H
+end
+SincKernel() = SincKernel(DataBasedDefault())
+
+function Empirikos._set_defaults(kernel::InfiniteOrderKernel, Zs::AbstractVector{<:Empirikos.AbstractNormalSample}; kwargs...)
+    Empirikos.skedasticity(Zs) == Empirikos.Homoskedastic() || throw("Only implemented for Homoskedastic Gaussian data.")
+    σ = std(Zs[1])
+    n = length(Zs)
+    h = σ/sqrt(log(n))
+    @set kernel.h = h
 end
 
-_default_bandwidth(::Type{SincKernel}, m::Integer) = 1/sqrt(log(m))
-SincKernel(; m = 1_000) = SincKernel(default_bandwidth(SincKernel, m))
 
 Distributions.cf(a::SincKernel, t) = one(Float64)*(-1/a.h <= t <= 1/a.h)
 
@@ -30,8 +39,7 @@ function Distributions.pdf(a::SincKernel, t)
    end
 end
 
-
-
+# TODO, General FlatTopKernel
 
 """
     DeLaValleePoussinKernel(h)
@@ -42,7 +50,7 @@ through the `KernelDensity.jl` package. The De La Vallée-Poussin kernel is defi
 K_V(x) = \\frac{\\cos(x)-\\cos(2x)}{\\pi x^2}
 ```
 Its use case is similar to the [`SincKernel`](@ref), however it has the advantage of being integrable
-(in the Lebesgue sense). Its Fourier transform is the following:
+(in the Lebesgue sense) and having bounded total variation. Its Fourier transform is the following:
 ```math
 K^*_V(t) = \\begin{cases}
  1, & \\text{ if } x\\in[-1,1] \\\\
@@ -51,16 +59,11 @@ K^*_V(t) = \\begin{cases}
  \\end{cases}
 ```
 """
-struct DeLaValleePoussinKernel <: ContinuousUnivariateDistribution
-   h::Float64 #Bandwidth
+struct DeLaValleePoussinKernel{H} <: InfiniteOrderKernel
+   h::H
 end
 
-
-_default_bandwidth(a::Type{DeLaValleePoussinKernel}, m::Integer) = 1/sqrt(log(m))
-
-function DeLaValleePoussinKernel(; m = 1_000)
-     DeLaValleePoussinKernel(default_bandwidth(DeLaValleePoussinKernel, m))
-end
+DeLaValleePoussinKernel() = DeLaValleePoussinKernel(DataBasedDefault())
 
 function Distributions.cf(a::DeLaValleePoussinKernel, t)
    if abs(t * a.h) <= 1
@@ -107,14 +110,29 @@ Note that the bound is valid from `a_min` to `a_max`.
   > estimators based upon a bootstrap resampling scheme. In Statistical models and methods
   > for biomedical and technical systems, pages 171–186. Springer, 2008
 """
-Base.@kwdef struct InfinityNormDensityBand{T<:Real, S} <: Empirikos.EBayesNeighborhood
-   a_min::T
-   a_max::T              # Idea: Add
+Base.@kwdef struct InfinityNormDensityBand <: Empirikos.EBayesNeighborhood
+   a_min = DataBasedDefault()
+   a_max = DataBasedDefault()
    npoints::Integer = 2048
-   bandwidth::S = nothing
-   kernel = DeLaValleePoussinKernel
+   kernel = DeLaValleePoussinKernel()
    nboot::Integer = 1000
    α::Float64 = 0.05
+end
+
+function Empirikos._set_defaults(method::InfinityNormDensityBand,
+                                Zs::AbstractVector{<:Empirikos.AbstractNormalSample{<:Number}};
+                                hints...)
+    Empirikos.skedasticity(Zs) == Empirikos.Homoskedastic() || throw("Only implemented for Homoskedastic Gaussian data.")
+
+    q = get(hints, :quantile, 0.1)
+    a_min, a_max = quantile(response.(Zs),  (q, 1-q))
+    if isa(method.a_min, DataBasedDefault)
+        method = @set method.a_min = a_min
+    end
+    if isa(method.a_max, DataBasedDefault)
+        method = @set method.a_max = a_max
+    end
+    method
 end
 
 """
@@ -129,50 +147,50 @@ a density ```f``.
 * `C∞`: This is the Poisson Bootstrap point estimate of ``\\sup_{x \\in [a_{\\text{min}} , a_{\\text{max}}]} | \\bar{f}(x) - f(x)|``
 * `fitted_kde`: The fitted `KernelDensity` object.
 """
-Base.@kwdef struct FittedInfinityNormDensityBand{T<:Real, S} <: Empirikos.FittedEBayesNeighborhood
+Base.@kwdef struct FittedInfinityNormDensityBand{T<:Real, S, K} <: Empirikos.FittedEBayesNeighborhood
     C∞::T
     a_min::T
     a_max::T
     fitted_kde
     interp_kde
     midpoints::S
+    estimated_density::K
     boot_samples
     method = nothing
 end
 
-function _default_bandwidth(kernel, Xs::AbstractVector, ::Nothing)
-    _default_bandwidth(kernel, Xs)
+function Empirikos.nominal_alpha(inftyband::FittedInfinityNormDensityBand)
+    Empirikos.nominal_alpha(inftyband.method)
 end
 
-function _default_bandwidth(kernel, Xs::AbstractVector)
-    _default_bandwidth(kernel, length(Xs))
-end
+function StatsBase.fit(opt::InfinityNormDensityBand,
+                       Zs::AbstractVector{<:Empirikos.AbstractNormalSample{<:Number}}; kwargs...)
+    Empirikos.skedasticity(Zs) == Empirikos.Homoskedastic() || throw("Only implemented for Homoskedastic Gaussian data.")
+    opt = Empirikos.set_defaults(opt, Zs; kwargs...)
 
-function _default_bandwidth(kernel, Xs::AbstractVector, h::Number)
-    h
-end
-
-function StatsBase.fit(opt::InfinityNormDensityBand, Xs)
     @unpack a_min, a_max, npoints, kernel, nboot, α = opt
-    bandwidth = _default_bandwidth(kernel, Xs, opt.bandwidth)
-    res = certainty_banded_KDE(Xs, a_min, a_max; npoints = npoints,
-                         kernel = kernel, bandwidth = bandwidth,
+
+    res = certainty_banded_KDE(response.(Zs), a_min, a_max;
+                         npoints = npoints,
+                         kernel = kernel,
                          nboot = nboot, α=α)
     res = @set res.method = opt
-    res
+    Z = Zs[1]
+    normal_midpoints =  [@set Z.Z = mdpt for mdpt in res.midpoints]
+    @set res.midpoints = normal_midpoints
 end
 
 function certainty_banded_KDE(Xs, a_min, a_max;
+                        kernel,
                         npoints = 4096,
-                        kernel=DeLaValleePoussinKernel,
-                        bandwidth = _default_bandwidth(kernel, length(Xs)),
-                        nboot = 1_000, α=0.5)
+                        nboot = 1_000,
+                        α=0.5)
 
-    kernel = kernel(bandwidth)
-    h = bandwidth
+    h = kernel.h
     m = length(Xs)
 
     lo, hi = extrema(Xs)
+    # avoid FFT wrap-around numerical difficulties
     lo_kde, hi_kde = min(a_min, lo - 6*h), max(a_max, hi + 6*h)
     midpts = range(lo_kde, hi_kde; length = npoints)
 
@@ -180,8 +198,6 @@ function certainty_banded_KDE(Xs, a_min, a_max;
     interp_kde = InterpKDE(fitted_kde)
     midpts_idx = findall( (midpts .>= a_min) .& (midpts .<= a_max) )
     C∞_boot = Vector{Float64}(undef, nboot)
-
-
 
     for k =1:nboot
         # Poisson bootstrap to estimate certainty band
@@ -199,6 +215,7 @@ function certainty_banded_KDE(Xs, a_min, a_max;
                     fitted_kde=fitted_kde,
                     interp_kde=interp_kde,
                     midpoints = fitted_kde.x[midpts_idx],
+                    estimated_density = fitted_kde.density[midpts_idx],
                     boot_samples = C∞_boot)
 end
 
@@ -216,16 +233,17 @@ end
 	foreground_color_legend --> :transparent
     grid --> nothing
 
-    infty_bound = quantile(ctband.samples, 0.95)#ctband.C∞
+    α = Empirikos.nominal_alpha(ctband)
+    ci_level = 100*(1-α)
 
-	cis_ribbon  = infty_bound
+	cis_ribbon  = ctband.C∞
 	fillalpha --> 0.36
 	seriescolor --> "#018AC4"
 	ribbon --> cis_ribbon
     linealpha --> 0
     framestyle --> :box
     legend --> :topleft
-    label --> "95\\% CI"
+    label --> "$ci_level% CI"
 
 	x, y
 end
@@ -235,68 +253,24 @@ end
 function Empirikos.neighborhood_constraint!(
     model,
     ctband::FittedInfinityNormDensityBand,
-    prior::Empirikos.PriorVariable,
-)
-    band = dkw.band
-    for (Z, cdf_value) in dkw.summary
-        marginal_cdf = cdf(prior, Z::EBayesSample)
-        if cdf_value + band < 1
-            @constraint(model, marginal_cdf <= cdf_value + band)
+    prior::Empirikos.PriorVariable)
+
+
+    C∞ = ctband.C∞
+    _midpoints = ctband.midpoints
+    _density_values = ctband.estimated_density
+
+    _min, _max = extrema(Empirikos.MarginalDensity(_midpoints[1]))
+    for (index, Z) in enumerate(_midpoints)
+        _density_hat = _density_values[index]
+        marginal_pdf = pdf(prior, Z::EBayesSample)
+
+        if _density_hat + C∞ < _max
+            @constraint(model, marginal_pdf <= _density_hat + C∞)
         end
-        if cdf_value - band > 0
-            @constraint(model, marginal_cdf >= cdf_value - band)
+        if _density_hat - C∞ > _min
+            @constraint(model, marginal_pdf >= _density_hat - C∞)
         end
     end
     model
-end
-
-
-"""
-    set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
-                          fkde::KDEInfinityBand)
-
-Return a [`DiscretizedStandardNormalSamples`](@ref) instance identical to `Zs_discr` but with
-`f_min`,`f_max`,`var_proxy` set based on the fit from `fkde`
-(cf.[`KDEInfinityBand`](@ref)).
-
-"""
-function set_neighborhood(Zs_discr,
-                          fkde)
-
-    @unpack n_interp, η_infl = fkde
-    grid = Zs_discr.mhist.grid
-    fkde_interp = fkde.interp_kde.itp
-    n = nobs(Zs_discr)
-
-    f_max = zeros(length(grid) + 1)
-    f_min = zeros(length(grid) + 1)
-    var_proxy =  zeros(length(grid) + 1)
-
-    C∞ = η_infl * fkde.C∞
-    # fill in intermediate points first
-    for i in 2:length(grid)
-        x_left = grid[i-1]
-        x_right = grid[i]
-        h = x_right - x_left  # step(grid)...
-        interp_res = fkde_interp(range(x_left, x_right, length=n_interp))
-        f_max[i] = maximum(interp_res)*h + C∞*h
-        f_min[i] = max( minimum(interp_res)*h - C∞*h, 0.0)
-        var_proxy[i] = max(maximum(interp_res)*h, C∞*h)
-    end
-
-    #fill in first and last element
-
-    # DKW constant with log(n) instead of log(2/alpha)
-    C_dkw = sqrt(log(n)/2n)
-    f_max[1] = pdf(Zs_discr.mhist)[1] + C_dkw
-    f_min[1] = max(pdf(Zs_discr.mhist)[1] - C_dkw, 0.0)
-    var_proxy[1] = f_max[1]
-    f_max[end] = pdf(Zs_discr.mhist)[end] + C_dkw
-    f_min[end] = max(pdf(Zs_discr.mhist)[end] - C_dkw, 0.0)
-    var_proxy[end] = f_max[end]
-
-    Zs_discr = @set Zs_discr.var_proxy = var_proxy
-    Zs_discr = @set Zs_discr.f_min = f_min
-    Zs_discr = @set Zs_discr.f_max = f_max
-    Zs_discr
 end
