@@ -1,14 +1,10 @@
-function DiscretizedAffineEstimator(mhist::MCEBHistogram, kernel::ContinuousUnivariateDistribution)
-    DiscretizedAffineEstimator(mhist, x->pdf(kernel, x))
-end
-
 """
     SincKernel(h)
-    
+
 Implements the `SincKernel` with bandwidth `h` to be used for kernel density estimation
-through the `KernelDensity.jl` package. The sinc kernel is defined as follows: 
+through the `KernelDensity.jl` package. The sinc kernel is defined as follows:
 ```math
-K_{\\text{sinc}}(x) = \\frac{\\sin(x)}{\\pi x} 
+K_{\\text{sinc}}(x) = \\frac{\\sin(x)}{\\pi x}
 ```
 It is not typically used for kernel density estimation, because this kernel is not
 a density itself. However, it is particularly well suited to deconvolution problems
@@ -24,9 +20,9 @@ end
 _default_bandwidth(::Type{SincKernel}, m::Integer) = 1/sqrt(log(m))
 SincKernel(; m = 1_000) = SincKernel(default_bandwidth(SincKernel, m))
 
-cf(a::SincKernel, t) = one(Float64)*(-1/a.h <= t <= 1/a.h)
+Distributions.cf(a::SincKernel, t) = one(Float64)*(-1/a.h <= t <= 1/a.h)
 
-function pdf(a::SincKernel, t)
+function Distributions.pdf(a::SincKernel, t)
    if t==zero(Float64)
        return(one(Float64)/pi/a.h)
    else
@@ -39,18 +35,18 @@ end
 
 """
     DeLaValleePoussinKernel(h)
-    
+
 Implements the `DeLaValleePoussinKernel` with bandwidth `h` to be used for kernel density estimation
-through the `KernelDensity.jl` package. The De La Vallée-Poussin kernel is defined as follows: 
+through the `KernelDensity.jl` package. The De La Vallée-Poussin kernel is defined as follows:
 ```math
 K_V(x) = \\frac{\\cos(x)-\\cos(2x)}{\\pi x^2}
 ```
 Its use case is similar to the [`SincKernel`](@ref), however it has the advantage of being integrable
 (in the Lebesgue sense). Its Fourier transform is the following:
 ```math
-K^*_V(t) = \\begin{cases} 
- 1, & \\text{ if } x\\in[-1,1] \\\\ 
- 0, &\\text{ if } |t| \\geq 2 \\\\ 
+K^*_V(t) = \\begin{cases}
+ 1, & \\text{ if } x\\in[-1,1] \\\\
+ 0, &\\text{ if } |t| \\geq 2 \\\\
  2-|t|,& \\text{ if } |t| \\in [1,2]
  \\end{cases}
 ```
@@ -66,17 +62,19 @@ function DeLaValleePoussinKernel(; m = 1_000)
      DeLaValleePoussinKernel(default_bandwidth(DeLaValleePoussinKernel, m))
 end
 
-function cf(a::DeLaValleePoussinKernel, t)
+function Distributions.cf(a::DeLaValleePoussinKernel, t)
    if abs(t * a.h) <= 1
        return(one(Float64))
-   elseif abs(t * a.h) <= 2
-       return(2*one(Float64) - abs(t * a.h))
-   else
-       return(zero(Float64))
-   end
+   #elseif abs(t * a.h) <=  2
+   #    return(2*one(Float64) - abs(t * a.h))
+    elseif abs(t * a.h) <=  1.1
+        return(one(Float64) - 10*(abs(t * a.h) - one(Float64)))
+    else
+        return(zero(Float64))
+    end
 end
 
-function pdf(a::DeLaValleePoussinKernel, t)
+function Distributions.pdf(a::DeLaValleePoussinKernel, t)
    if t==zero(Float64)
        return(3*one(Float64)/2/pi/a.h)
    else
@@ -85,9 +83,9 @@ function pdf(a::DeLaValleePoussinKernel, t)
 end
 
 """
-    KDEInfinityBandOptions(; kernel=DeLaValleePoussinKernel
+InfinityNormDensityBand(; kernel=DeLaValleePoussinKernel
                              bandwidth = nothing,
-                             a_min, 
+                             a_min,
                              a_max,
                              nboot = 1000)
 
@@ -102,28 +100,26 @@ neighborhood ``c_m`` of the true density ``f`` which is such that with probabili
 ```math
 \\sup_{x \\in [a_{\\text{min}} , a_{\\text{max}}]} | \\bar{f}(x) - f(x)| \\leq c_m
 ```
-Note that the bound is valid from `a_min` to `a_max`. 
+Note that the bound is valid from `a_min` to `a_max`.
 
 ## Reference:
-  > Paul Deheuvels and Gérard Derzko. Asymptotic certainty bands for kernel density 
-  > estimators based upon a bootstrap resampling scheme. In Statistical models and methods 
+  > Paul Deheuvels and Gérard Derzko. Asymptotic certainty bands for kernel density
+  > estimators based upon a bootstrap resampling scheme. In Statistical models and methods
   > for biomedical and technical systems, pages 171–186. Springer, 2008
 """
-Base.@kwdef struct KDEInfinityBandOptions{T<:Real, 
-                                         S<:Union{T, Nothing}}
+Base.@kwdef struct InfinityNormDensityBand{T<:Real, S} <: Empirikos.EBayesNeighborhood
    a_min::T
-   a_max::T
-   npoints::Integer = 4096
+   a_max::T              # Idea: Add
+   npoints::Integer = 2048
    bandwidth::S = nothing
    kernel = DeLaValleePoussinKernel
    nboot::Integer = 1000
-   η_infl::T = 1.1
-   n_interp::Integer = 25
+   α::Float64 = 0.05
 end
 
 """
-    KDEInfinityBand
-    
+    FittedInfinityNormDensityBand
+
 The result of running `StatsBase.fit(opt::KDEInfinityBandOptions, Xs)`. Here `opt` is an instance
 of [`KDEInfinityBandOptions`](@ref) and `Xs` is a vector of samples distributed according to
 a density ```f``.
@@ -133,49 +129,44 @@ a density ```f``.
 * `C∞`: This is the Poisson Bootstrap point estimate of ``\\sup_{x \\in [a_{\\text{min}} , a_{\\text{max}}]} | \\bar{f}(x) - f(x)|``
 * `fitted_kde`: The fitted `KernelDensity` object.
 """
-Base.@kwdef struct KDEInfinityBand{T<:Real}
+Base.@kwdef struct FittedInfinityNormDensityBand{T<:Real, S} <: Empirikos.FittedEBayesNeighborhood
     C∞::T
     a_min::T
     a_max::T
     fitted_kde
     interp_kde
-    kernel
-    η_infl::T = 1.1
-    n_interp::Integer = 25
+    midpoints::S
+    boot_samples
+    method = nothing
 end
 
 function _default_bandwidth(kernel, Xs::AbstractVector, ::Nothing)
     _default_bandwidth(kernel, Xs)
-end 
+end
 
 function _default_bandwidth(kernel, Xs::AbstractVector)
     _default_bandwidth(kernel, length(Xs))
-end 
+end
 
 function _default_bandwidth(kernel, Xs::AbstractVector, h::Number)
     h
-end 
+end
 
-function StatsBase.fit(opt::KDEInfinityBandOptions, Xs)
-    a_min = opt.a_min
-    a_max = opt.a_max
-    npoints = opt.npoints
-    kernel = opt.kernel
+function StatsBase.fit(opt::InfinityNormDensityBand, Xs)
+    @unpack a_min, a_max, npoints, kernel, nboot, α = opt
     bandwidth = _default_bandwidth(kernel, Xs, opt.bandwidth)
-    nboot = opt.nboot
-    tmp_res = certainty_banded_KDE(Xs, a_min, a_max; npoints = npoints, 
+    res = certainty_banded_KDE(Xs, a_min, a_max; npoints = npoints,
                          kernel = kernel, bandwidth = bandwidth,
-                         nboot = nboot)
-    tmp_res = @set tmp_res.η_infl = opt.η_infl
-    tmp_res = @set tmp_res.n_interp = opt.n_interp
-    tmp_res
+                         nboot = nboot, α=α)
+    res = @set res.method = opt
+    res
 end
 
 function certainty_banded_KDE(Xs, a_min, a_max;
                         npoints = 4096,
                         kernel=DeLaValleePoussinKernel,
                         bandwidth = _default_bandwidth(kernel, length(Xs)),
-                        nboot = 1_000)
+                        nboot = 1_000, α=0.5)
 
     kernel = kernel(bandwidth)
     h = bandwidth
@@ -200,64 +191,79 @@ function certainty_banded_KDE(Xs, a_min, a_max;
         C∞_boot[k] = maximum(abs.(fitted_kde.density[midpts_idx] .- f_kde_pois.density[midpts_idx]))
     end
 
-    C∞ = median(C∞_boot)
+    C∞ = quantile(C∞_boot, 1-α)
 
-    KDEInfinityBand(C∞=C∞,
+    FittedInfinityNormDensityBand(C∞=C∞,
                     a_min=a_min,
                     a_max=a_max,
                     fitted_kde=fitted_kde,
                     interp_kde=interp_kde,
-                    kernel=kernel)
-end
-
-function certainty_banded_KDE(Xs, Zs_discr::DiscretizedStandardNormalSamples; kwargs...)
-    a_min, a_max = extrema(Zs_discr.mhist.grid)
-    certainty_banded_KDE(Xs, a_min, a_max; kwargs...)
+                    midpoints = fitted_kde.x[midpts_idx],
+                    boot_samples = C∞_boot)
 end
 
 
-
-# plotting of infinite band
-
-
-
-
-@recipe function f(ctband::KDEInfinityBand;
-                        show_bands=true)
+@recipe function f(ctband::FittedInfinityNormDensityBand)
     y = ctband.fitted_kde.density
     x = ctband.fitted_kde.x
-    xlim --> (ctband.a_min, ctband.a_max)
-    ylab --> "Density"
+    xlims --> (ctband.a_min, ctband.a_max)
+    yguide --> "Density"
 
     seriestype  -->  :path
     linewidth --> 2
-    color --> :purple
-    
-    infty_bound = ctband.C∞ * ctband.η_infl
-    
-    if show_bands
-        _ys_lower, _ys_upper = density_bands_to_ribbons(y, infty_bound)
-        ribbons --> (_ys_lower, _ys_lower)
-        fillalpha --> 0.2
-    end
+    seriescolor --> :purple
+	background_color_legend --> :transparent
+	foreground_color_legend --> :transparent
+    grid --> nothing
 
-    xguide --> L"x"
-    x,y
+    infty_bound = quantile(ctband.samples, 0.95)#ctband.C∞
+
+	cis_ribbon  = infty_bound
+	fillalpha --> 0.36
+	seriescolor --> "#018AC4"
+	ribbon --> cis_ribbon
+    linealpha --> 0
+    framestyle --> :box
+    legend --> :topleft
+    label --> "95\\% CI"
+
+	x, y
 end
+
+
+
+function Empirikos.neighborhood_constraint!(
+    model,
+    ctband::FittedInfinityNormDensityBand,
+    prior::Empirikos.PriorVariable,
+)
+    band = dkw.band
+    for (Z, cdf_value) in dkw.summary
+        marginal_cdf = cdf(prior, Z::EBayesSample)
+        if cdf_value + band < 1
+            @constraint(model, marginal_cdf <= cdf_value + band)
+        end
+        if cdf_value - band > 0
+            @constraint(model, marginal_cdf >= cdf_value - band)
+        end
+    end
+    model
+end
+
 
 """
     set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
                           fkde::KDEInfinityBand)
 
-Return a [`DiscretizedStandardNormalSamples`](@ref) instance identical to `Zs_discr` but with 
+Return a [`DiscretizedStandardNormalSamples`](@ref) instance identical to `Zs_discr` but with
 `f_min`,`f_max`,`var_proxy` set based on the fit from `fkde`
-(cf.[`KDEInfinityBand`](@ref)).                     
-                          
+(cf.[`KDEInfinityBand`](@ref)).
+
 """
-function set_neighborhood(Zs_discr::DiscretizedStandardNormalSamples,
-                          fkde::KDEInfinityBand)
-    
-    @unpack n_interp, η_infl = fkde 
+function set_neighborhood(Zs_discr,
+                          fkde)
+
+    @unpack n_interp, η_infl = fkde
     grid = Zs_discr.mhist.grid
     fkde_interp = fkde.interp_kde.itp
     n = nobs(Zs_discr)

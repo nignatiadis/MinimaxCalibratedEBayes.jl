@@ -42,6 +42,7 @@ using StatsBase
 using UnPack
 #import Statistics:var
 
+using Distributions
 #import Distributions:cf,
 #                     estimate,
 #                     pdf,
@@ -68,7 +69,8 @@ using UnPack
 
 
 include("load_datasets.jl")
-include("target_ci.jl")
+include("confidence_interval_tools.jl")
+include("density_neighborhood.jl")
 include("neighborhood_worst_case.jl")
 include("local_linear_minimax.jl")
 
