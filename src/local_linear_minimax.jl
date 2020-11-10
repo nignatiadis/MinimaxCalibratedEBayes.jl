@@ -1,9 +1,13 @@
-struct LocalizedAffineMinimax{N<:Union{Nothing, Empirikos.FittedEBayesNeighborhood},G, D}
-    convexclass::G
-    estimated_marginal_density::D
-    neighborhood::N
-    solver
-end
+#----------------------------------
+# Structure
+#----------------------------------
+# ModulusModel contains all JuMP related information
+# LocalizedAffineMinimax contains optimization information
+# SteinMinimaxEstimator contains the fit result
+#
+
+
+
 
 
 Base.@kwdef struct ModulusModel
@@ -33,17 +37,70 @@ function get_δ(model::ModulusModel; recalculate_δ = false)
     end
 end
 
-#target = Empirikos.PriorDensity(1.0)
-#eb_intervals = StandardNormalSample.(discr.sorted_intervals)
+"""
+    DeltaTuner
 
-function initialize_modulus_model(method::LocalizedAffineMinimax, target)
+Abstract type used to represent ways of picking
+``\\delta`` at which to solve the modulus problem, cf.
+Manuscript. Different choices of ``\\delta`` correspond
+to different choices of the Bias-Variance tradeoff with
+every choice leading to Pareto-optimal tradeoff.
+"""
+abstract type DeltaTuner end
 
-    estimated_marginal_density = method.estimated_marginal_density
+abstract type BiasVarAggregate <: DeltaTuner end
+
+function get_bias_var(modulus_model::ModulusModel)
+    @unpack model = modulus_model
+    δ = get_δ(modulus_model)
+    ω_δ = objective_value(model)
+    ω_δ_prime = -JuMP.dual(modulus_model.bound_delta)
+    max_bias = (ω_δ - δ*ω_δ_prime)/2
+    unit_var_proxy = ω_δ_prime^2
+    max_bias, unit_var_proxy
+end
+
+function (bv::BiasVarAggregate)(modulus_model::ModulusModel)
+    bv(get_bias_var(modulus_model)...)
+end
+
+"""
+    RMSE(n::Integer, δ_min::Float64) <: DeltaTuner
+
+A `DeltaTuner` to optimizes
+the worst-case (root) mean squared error.  Here `n` is the sample
+size used for estimation.
+"""
+struct RMSE{N} <: BiasVarAggregate
+    n::N
+end
+
+(rmse::RMSE)(bias, unit_var_proxy) =  sqrt(bias^2 + unit_var_proxy/rmse.n)
+
+function Empirikos._set_defaults(rmse::RMSE, Zs; hints)
+    RMSE(length(Zs)) #nobs?
+end
+
+Base.@kwdef struct LocalizedAffineMinimax{N, G, M}
+    convexclass::G
+    neighborhood::N
+    solver
+    discretizer
+    plugin_G
+    data_split = :none
+    delta_grid = 0.2:0.3:5
+    delta_objective = RMSE(DataBasedDefault())
+    modulus_model::M = nothing
+    n = nothing
+end
+
+function initialize_modulus_model(method::LocalizedAffineMinimax, target, δ)
+
+    estimated_marginal_density = method.discretizer
     neighborhood = method.neighborhood
     gcal = method.convexclass
 
     solver = method.solver
-
 
     model = Model(solver)
 
@@ -66,15 +123,12 @@ function initialize_modulus_model(method::LocalizedAffineMinimax, target)
     @constraint(model, pseudo_chisq_constraint,
            [δ_up; Δf] in SecondOrderCone())
 
-
     @objective(model, Max, target(g2) - target(g1))
-    optimize!(model)
-    δ_max = get_δ(Δf)
 
-    @constraint(model, bound_delta, δ_up == δ_max)
+    @constraint(model, bound_delta, δ_up <= δ)
 
     ModulusModel(method=method, model=model, g1=g1, g2=g2, f1=f1, f2=f2,
-        f_sqrt=f_sqrt, Δf=Δf, δ_max=δ_max, δ_up=δ_up,
+        f_sqrt=f_sqrt, Δf=Δf, δ_max=Inf, δ_up=δ_up,
         bound_delta=bound_delta, target=target)
 end
 
@@ -86,6 +140,9 @@ function set_δ!(modulus_model, δ)
 end
 
 function set_target!(modulus_model, target)
+    if modulus_model.target == target
+        return modulus_model
+    end
     @unpack model, g1, g2 = modulus_model
     @objective(model, Max, target(g2) - target(g1))
     modulus_model = @set modulus_model.target = target
@@ -94,8 +151,37 @@ function set_target!(modulus_model, target)
 end
 
 
+function StatsBase.fit(method::LocalizedAffineMinimax, target, Zs; kwargs...)
+    method = Empirikos.set_defaults(method, Zs; kwargs...)
+    fitted_nbhood = StatsBase.fit(method.neighborhood, Zs; kwargs...)
+    fitted_plugin_G = StatsBase.fit(method.plugin_G, Zs; kwargs...) #TODO SPECIAL CASE for ::Distribution
+    discr = method.discretizer
 
-Base.@kwdef mutable struct SteinMinimaxEstimator{M, T, D}
+    # todo: fix this
+    _ints = StandardNormalSample.(discr.sorted_intervals)
+    fitted_density = Empirikos.DiscretizedDictFunction(discr,
+                                              DictFunction(_ints, pdf.(fitted_plugin_G.prior, _ints)))
+
+    method = @set method.neighborhood = fitted_nbhood
+    method = @set method.plugin_G = fitted_plugin_G
+    method = @set method.discretizer = fitted_density
+
+    n = nobs(Zs) #TODO: length or nobs?
+    method = @set method.n = n
+
+    @unpack delta_grid = method
+
+    δ1 = delta_grid[1]
+    modulus_model = initialize_modulus_model(method, target, δ1)
+    method = @set method.modulus_model = modulus_model
+
+    _fit_initialized(method::LocalizedAffineMinimax, target, Zs; kwargs...)
+end
+
+
+
+
+Base.@kwdef mutable struct SteinMinimaxEstimator{M, T, D, S}
     target::T
     δ::Float64
     ω_δ::Float64
@@ -106,6 +192,8 @@ Base.@kwdef mutable struct SteinMinimaxEstimator{M, T, D}
     max_bias::Float64
     unit_var_proxy::Float64 #n::Int64
     modulus_model::M #    δ_tuner::DeltaTuner
+    δs::S = zeros(Float64,5)
+    δs_objective::S = zeros(Float64,5)
 end
 
 var(sme::SteinMinimaxEstimator) = sme.unit_var_proxy/sme.n
@@ -140,7 +228,9 @@ end
 
 function SteinMinimaxEstimator(modulus_model::ModulusModel)
     @unpack model, method, target = modulus_model
-    @unpack convexclass, estimated_marginal_density = method
+    @unpack convexclass, discretizer = method
+
+    estimated_marginal_density = discretizer
 
     δ = get_δ(modulus_model)
     ω_δ = objective_value(model)
@@ -182,6 +272,23 @@ SteinMinimaxEstimator(
               modulus_model=modulus_model)
 end
 
+
+function _fit_initialized(method::LocalizedAffineMinimax, target, Zs; kwargs...)
+    @unpack modulus_model, delta_grid, delta_objective,n = method
+    set_target!(modulus_model, target)
+
+    δs_objective = zeros(Float64, length(delta_grid))
+    for (index, δ) in enumerate(delta_grid)
+        set_δ!(modulus_model, δ/sqrt(n)) #TODO: sanity checks
+        δs_objective[index] = delta_objective(modulus_model)
+    end
+    idx_best = argmin(δs_objective)
+    set_δ!(modulus_model, delta_grid[idx_best]/sqrt(n)) #TODO: sanity checks
+    sm = SteinMinimaxEstimator(modulus_model)
+    sm = @set sm.δs = collect(delta_grid)
+    sm = @set sm.δs_objective = δs_objective
+    sm
+end
 
 
 function StatsBase.confint(Q::SteinMinimaxEstimator, target, Zs; α=0.05)
