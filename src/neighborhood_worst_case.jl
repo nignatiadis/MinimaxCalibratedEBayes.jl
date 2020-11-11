@@ -64,11 +64,11 @@ function StatsBase.fit(method::FittedNeighborhoodWorstCase{<:Empirikos.AbstractP
     set_objective(lfp, JuMP.MOI.MIN_SENSE, target_numerator_g, target_denominator_g)
     optimize!(lfp)
     _min = objective_value(lfp)
-    g1 = g(JuMP.value.(g.finite_param))
+    g1 = g()
     set_objective(lfp, JuMP.MOI.MAX_SENSE, target_numerator_g, target_denominator_g)
     optimize!(lfp)
     _max = objective_value(lfp)
-    g2 = g(JuMP.value.(g.finite_param))
+    g2 = g()
 
     FittedNeighborhoodWorstCase(method=method.method,
         target=target,
@@ -108,12 +108,12 @@ function StatsBase.fit(method::FittedNeighborhoodWorstCase{<:Empirikos.LinearEBa
     @objective(lp, Min, target_g)
     optimize!(lp)
     _min = objective_value(lp)
-    g1 = g(JuMP.value.(g.finite_param))
+    g1 = g()
 
     @objective(lp, Max, target_g)
     optimize!(lp)
     _max = objective_value(lp)
-    g2 = g(JuMP.value.(g.finite_param))
+    g2 = g()
 
     FittedNeighborhoodWorstCase(method=method.method,
         target=target,
