@@ -21,7 +21,11 @@ function Base.show(io::IO, ci::LowerUpperConfidenceInterval)
 end
 
 @recipe function f(bands::AbstractVector{<:ConfindenceInterval})
-	x = [Float64(location(band.target)) for band in bands]
+    x = [Float64(location(band.target)) for band in bands]
+    x, bands
+end
+
+@recipe function f(t, x, bands::AbstractVector{<:ConfindenceInterval})
     lower = getproperty.(bands, :lower)
     upper = getproperty.(bands, :upper)
     estimate = getproperty.(bands, :estimate)
@@ -29,20 +33,28 @@ end
 	background_color_legend --> :transparent
 	foreground_color_legend --> :transparent
     grid --> nothing
-
-	cis_ribbon  = estimate .- lower, upper .- estimate
-	fillalpha --> 0.36
-	seriescolor --> "#018AC4"
-	ribbon --> cis_ribbon
-    linealpha --> 0
     framestyle --> :box
     legend --> :topleft
-	label --> "95\\% CI"
-	x, estimate
+
+
+	    cis_ribbon  = estimate .- lower, upper .- estimate
+	    fillalpha --> 0.36
+	    seriescolor --> "#018AC4"
+	    ribbon --> cis_ribbon
+        linealpha --> 0
+        return x, estimate
+
 end
 
 
 function gaussian_ci(se; maxbias=0.0, α=0.05)
+    @show se,maxbias,α
+    nc = NoncentralChisq(1, abs2(maxbias))
+    se*sqrt(quantile(nc, 1-α))
+end
+
+function gaussian_ci_test(se; maxbias=0.0, α=0.05)
+    @show se,maxbias,α
     level = 1 - α
     rel_bias = maxbias/se
     zz = fzero( z-> cdf(Normal(), rel_bias-z) + cdf(Normal(), -rel_bias-z) +  level -1,

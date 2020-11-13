@@ -65,7 +65,7 @@ function (bv::BiasVarAggregate)(modulus_model::ModulusModel)
 end
 
 """
-    RMSE(n::Integer, δ_min::Float64) <: DeltaTuner
+    RMSE(n::Integer) <: DeltaTuner
 
 A `DeltaTuner` to optimizes
 the worst-case (root) mean squared error.  Here `n` is the sample
@@ -75,11 +75,36 @@ struct RMSE{N} <: BiasVarAggregate
     n::N
 end
 
+RMSE() = RMSE(DataBasedDefault())
 (rmse::RMSE)(bias, unit_var_proxy) =  sqrt(bias^2 + unit_var_proxy/rmse.n)
 
 function Empirikos._set_defaults(rmse::RMSE, Zs; hints)
     RMSE(length(Zs)) #nobs?
 end
+
+
+"""
+    HalfCIWidth(n::Integer, α::Float64) <: DeltaTuner
+
+A `DeltaTuner` that chooses the `δ ≧ δ_min` the optimizes
+the worst-case confidence interval width.  Here `n` is the sample
+size used for estimation.
+"""
+Base.@kwdef struct HalfCIWidth{N} <: BiasVarAggregate
+    n::N = DataBasedDefault()
+    α::Float64 = 0.05
+end
+
+function Empirikos._set_defaults(halfci::HalfCIWidth, Zs; hints)
+    @set halfci.n = length(Zs)
+end
+
+
+function (half_ci::HalfCIWidth)(bias, unit_var_proxy)
+    se = sqrt(unit_var_proxy/half_ci.n)
+    gaussian_ci(se; maxbias=bias, α=half_ci.α)
+end
+
 
 Base.@kwdef struct LocalizedAffineMinimax{N, G, M}
     convexclass::G
@@ -88,8 +113,8 @@ Base.@kwdef struct LocalizedAffineMinimax{N, G, M}
     discretizer
     plugin_G
     data_split = :none
-    delta_grid = 0.2:0.3:5
-    delta_objective = RMSE(DataBasedDefault())
+    delta_grid = 0.2:0.5:5
+    delta_objective = RMSE()
     modulus_model::M = nothing
     n = nothing
 end
@@ -156,7 +181,11 @@ function initialize_method(method::LocalizedAffineMinimax, target::Empirikos.Lin
 
     method = Empirikos.set_defaults(method, Zs; kwargs...)
     fitted_nbhood = StatsBase.fit(method.neighborhood, Zs; kwargs...)
-    fitted_plugin_G = StatsBase.fit(method.plugin_G, Zs; kwargs...) #TODO SPECIAL CASE for ::Distribution
+    if isa(method.plugin_G, Distribution) #TODO SPECIAL CASE this elsewhere?
+        fitted_plugin_G = method.plugin_G
+    else
+        fitted_plugin_G = StatsBase.fit(method.plugin_G, Zs; kwargs...)
+    end
     discr = method.discretizer #TODO SPECIAL CASE for ::Distribution
 
     # todo: fix this
@@ -347,7 +376,8 @@ function Base.broadcasted(::typeof(StatsBase.confint), method::LocalizedAffineMi
 end
 
 
-function StatsBase.confint(method::LocalizedAffineMinimax, target::Empirikos.AbstractPosteriorTarget, Zs; initialized=false, α=0.05, kwargs...)
+function StatsBase.confint(method::LocalizedAffineMinimax, target::Empirikos.AbstractPosteriorTarget, Zs;
+                          initialized=false, α=0.05, c_lower=nothing, c_upper=nothing, single_delta=true, kwargs...)
     if !initialized
         init_target = Empirikos.PosteriorTargetNullHypothesis(target, 0.0)
         method = initialize_method(method, init_target, Zs; kwargs...)
@@ -355,16 +385,22 @@ function StatsBase.confint(method::LocalizedAffineMinimax, target::Empirikos.Abs
         init_target = Empirikos.PosteriorTargetNullHypothesis(target, target(method.plugin_G))
         _fit = _fit_initialized(method, init_target, Zs)
 
-        δ = _fit.δ
-        method = @set method.delta_grid = [δ]
+        if single_delta
+            δ = _fit.δ
+            method = @set method.delta_grid = [δ]
+        end
     end
 
     nbhood_worst_case = NeighborhoodWorstCase(method.neighborhood, method.convexclass, method.solver)
     outer_ci = StatsBase.confint(nbhood_worst_case, target)
     outer_ci =  @set outer_ci.α = α
 
-    c_lower = outer_ci.lower
-    c_upper = outer_ci.upper
+    if isnothing(c_lower)
+        @show c_lower = outer_ci.lower
+    end
+    if isnothing(c_upper)
+        @show c_upper = outer_ci.upper
+    end
 
     target_lower = Empirikos.PosteriorTargetNullHypothesis(target, c_lower)
     target_upper = Empirikos.PosteriorTargetNullHypothesis(target, c_upper)
@@ -407,8 +443,10 @@ function StatsBase.confint(method::LocalizedAffineMinimax, target::Empirikos.Abs
     #all_cis_upper = last.(all_cis)
     #plot(λs, [all_cis_lower all_cis_upper])
 
+
     λs_lhs =  find_zeros(λ -> first(confint(bisection_pair, λ; α=α))  , 0.0, 1.0)
     λs_rhs =  find_zeros(λ -> last(confint(bisection_pair, λ; α=α))  , 0.0, 1.0)
+    @show λs_lhs, λs_rhs
     λ_lhs = minimum(λs_lhs)
     λ_rhs = maximum(λs_rhs)
 
@@ -442,8 +480,12 @@ function Base.broadcasted(::typeof(StatsBase.confint), method::LocalizedAffineMi
     init_target = Empirikos.PosteriorTargetNullHypothesis(target, target(method.plugin_G))
     _fit = _fit_initialized(method, init_target, Zs)
 
-    δ = _fit.δ
-    method = @set method.delta_grid = [δ]
+    single_delta = false
+    if single_delta
+        δ = _fit.δ
+        method = @set method.delta_grid = [δ]
+    end
+
 
     confint_vec =  Vector{MinimaxCalibratedEBayes.LowerUpperConfidenceInterval}(undef, length(targets))
 
