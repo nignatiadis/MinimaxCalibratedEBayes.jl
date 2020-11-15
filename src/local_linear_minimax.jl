@@ -79,7 +79,7 @@ RMSE() = RMSE(DataBasedDefault())
 (rmse::RMSE)(bias, unit_var_proxy) =  sqrt(bias^2 + unit_var_proxy/rmse.n)
 
 function Empirikos._set_defaults(rmse::RMSE, Zs; hints)
-    RMSE(length(Zs)) #nobs?
+    RMSE(nobs(Zs))
 end
 
 
@@ -96,7 +96,7 @@ Base.@kwdef struct HalfCIWidth{N} <: BiasVarAggregate
 end
 
 function Empirikos._set_defaults(halfci::HalfCIWidth, Zs; hints)
-    @set halfci.n = length(Zs)
+    @set halfci.n = nobs(Zs)
 end
 
 
@@ -110,18 +110,19 @@ Base.@kwdef struct LocalizedAffineMinimax{N, G, M}
     convexclass::G
     neighborhood::N
     solver
-    discretizer
+    discretizer = DataBasedDefault()
     plugin_G
     data_split = :none
     delta_grid = 0.2:0.5:5
     delta_objective = RMSE()
+    estimated_marginal_density = nothing
     modulus_model::M = nothing
     n = nothing
 end
 
 function initialize_modulus_model(method::LocalizedAffineMinimax, target::Empirikos.LinearEBayesTarget, δ)
 
-    estimated_marginal_density = method.discretizer
+    estimated_marginal_density = method.estimated_marginal_density
     neighborhood = method.neighborhood
     gcal = method.convexclass
 
@@ -189,13 +190,11 @@ function initialize_method(method::LocalizedAffineMinimax, target::Empirikos.Lin
     discr = method.discretizer #TODO SPECIAL CASE for ::Distribution
 
     # todo: fix this
-    _ints = StandardNormalSample.(discr.sorted_intervals)
-    fitted_density = Empirikos.DiscretizedDictFunction(discr,
-                                              DictFunction(_ints, pdf.(fitted_plugin_G.prior, _ints)))
+    fitted_density = Empirikos.dictfun(discr, Zs, z-> pdf(fitted_plugin_G.prior, z))
 
     method = @set method.neighborhood = fitted_nbhood
     method = @set method.plugin_G = fitted_plugin_G
-    method = @set method.discretizer = fitted_density
+    method = @set method.estimated_marginal_density = fitted_density
 
     n = nobs(Zs) #TODO: length or nobs?
     method = @set method.n = n
@@ -267,9 +266,7 @@ end
 
 function SteinMinimaxEstimator(modulus_model::ModulusModel)
     @unpack model, method, target = modulus_model
-    @unpack convexclass, discretizer = method
-
-    estimated_marginal_density = discretizer
+    @unpack convexclass, estimated_marginal_density = method
 
     δ = get_δ(modulus_model)
     ω_δ = objective_value(model)
@@ -292,7 +289,7 @@ function SteinMinimaxEstimator(modulus_model::ModulusModel)
     Q_0  = (L1+L2)/2 -
         ω_δ_prime/(2*δ)*sum( (f2 .- f1).* (f2 .+ f1) ./ f̄s)
 
-    Q = Empirikos.DiscretizedDictFunction(estimated_marginal_density.discretizer, DictFunction(Zs, Q .+ Q_0))
+    Q = Empirikos.dictfun(method.discretizer, Zs, Q .+ Q_0)
 
     max_bias = (ω_δ - δ*ω_δ_prime)/2
     unit_var_proxy = ω_δ_prime^2
@@ -339,8 +336,10 @@ end
 
 function StatsBase.confint(Q::SteinMinimaxEstimator, target, Zs; α=0.05)
     _bias = Q.max_bias
-    _se = std(Q.Q.(Zs))/sqrt(nobs(Zs))
-    point_estimate = mean(Q.Q.(Zs))
+    _Qs = Q.Q.(Zs)
+    _wts = StatsBase.weights(Zs)
+    _se = std(Q.Q.(Zs), _wts)/sqrt(nobs(Zs))
+    point_estimate = mean(Q.Q.(Zs), _wts)
     halfwidth = MinimaxCalibratedEBayes.gaussian_ci(_se; maxbias=_bias, α=α)
     BiasVarianceConfidenceInterval(estimate = point_estimate,
                                    maxbias = _bias,
@@ -377,7 +376,7 @@ end
 
 
 function StatsBase.confint(method::LocalizedAffineMinimax, target::Empirikos.AbstractPosteriorTarget, Zs;
-                          initialized=false, α=0.05, c_lower=nothing, c_upper=nothing, single_delta=true, kwargs...)
+                          initialized=false, α=0.05, c_lower=nothing, c_upper=nothing, single_delta=false, kwargs...)
     if !initialized
         init_target = Empirikos.PosteriorTargetNullHypothesis(target, 0.0)
         method = initialize_method(method, init_target, Zs; kwargs...)
@@ -412,16 +411,17 @@ function StatsBase.confint(method::LocalizedAffineMinimax, target::Empirikos.Abs
 
 
     Q_lower = _fit.Q.(Zs)
+    _wts = StatsBase.weights(Zs)
     confint_lower = StatsBase.confint(_fit, target_lower, Zs; α=α)
     max_bias_lower = confint_lower.maxbias   # TODO: extract from better CI object
-    var_Q_lower = var(Q_lower)/n
+    var_Q_lower = var(Q_lower, _wts)/n
     estimate_lower = confint_lower.estimate
 
     _fit = _fit_initialized(method, target_upper, Zs) #TODO: should have some bang!?
     Q_upper = _fit.Q.(Zs)
     confint_upper = StatsBase.confint(_fit, target_upper, Zs ; α=α)
     max_bias_upper = confint_upper.maxbias
-    var_Q_upper = var(Q_upper)/n
+    var_Q_upper = var(Q_upper, _wts)/n
     estimate_upper = confint_upper.estimate
 
     cov_lower_upper = cov(Q_lower, Q_upper)/n

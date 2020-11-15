@@ -27,6 +27,7 @@ using LinearAlgebra
 #using OscillatoryIntegrals
 #using Parameters
 #using Plots
+using ParameterJuMP
 using RecipesBase
 using Roots
 using Setfield

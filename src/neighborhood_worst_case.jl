@@ -1,7 +1,8 @@
-struct NeighborhoodWorstCase{N,G}
+Base.@kwdef struct NeighborhoodWorstCase{N,G}
     neighborhood::N
     convexclass::G
     solver
+    n_bisection::Int = 100
 end
 
 function Empirikos.nominal_alpha(nbhood::NeighborhoodWorstCase)
@@ -32,9 +33,13 @@ function StatsBase.fit(method::NeighborhoodWorstCase, target, Zs; kwargs...)
     StatsBase.fit(method, target)
 end
 
-
 function StatsBase.fit(method::NeighborhoodWorstCase{<:Empirikos.FittedEBayesNeighborhood},
     target::Empirikos.AbstractPosteriorTarget)
+    StatsBase.fit(method, target, Empirikos.vexity(method.neighborhood))
+end
+
+function StatsBase.fit(method::NeighborhoodWorstCase{<:Empirikos.FittedEBayesNeighborhood},
+    target::Empirikos.AbstractPosteriorTarget, ::Empirikos.LinearVexity)
 
     lfp = LinearFractionalModel(method.solver)
     g = Empirikos.prior_variable!(lfp, method.convexclass)
@@ -49,8 +54,14 @@ function StatsBase.fit(method::NeighborhoodWorstCase{<:Empirikos.FittedEBayesNei
     StatsBase.fit(fitted_worst_case, target)
 end
 
+
 function StatsBase.fit(method::FittedNeighborhoodWorstCase{<:Empirikos.AbstractPosteriorTarget},
-                       target::Empirikos.AbstractPosteriorTarget)
+    target::Empirikos.AbstractPosteriorTarget)
+    StatsBase.fit(method, target, Empirikos.vexity(method.method.neighborhood))
+end
+
+function StatsBase.fit(method::FittedNeighborhoodWorstCase{<:Empirikos.AbstractPosteriorTarget},
+                       target::Empirikos.AbstractPosteriorTarget, ::Empirikos.LinearVexity)
 
     g = method.gmodel
     lfp = method.model
@@ -79,6 +90,61 @@ function StatsBase.fit(method::FittedNeighborhoodWorstCase{<:Empirikos.AbstractP
         lower=_min,
         upper=_max)
 end
+
+function StatsBase.fit(method::NeighborhoodWorstCase{<:Empirikos.FittedEBayesNeighborhood},
+    target::Empirikos.AbstractPosteriorTarget, ::Empirikos.ConvexVexity)
+
+    @unpack n_bisection, solver, convexclass, neighborhood = method
+
+    _max_vals = Vector{Float64}(undef, n_bisection)
+    _min_vals = Vector{Float64}(undef, n_bisection)
+
+    model = ModelWithParams(solver)
+    g = Empirikos.prior_variable!(model, convexclass)
+
+    Empirikos.neighborhood_constraint!(model, neighborhood, g)
+    num_target = numerator(target)
+    denom_target = denominator(target)
+    @objective(model, Max, denom_target(g))
+    optimize!(model)
+    _max_denom = JuMP.objective_value(model)
+    @objective(model, Min, denom_target(g))
+    optimize!(model)
+    _min_denom = JuMP.objective_value(model)
+
+    _denom_range = range(_min_denom, stop=_max_denom, length=n_bisection)
+    t = add_parameter(model, _min_denom)
+    @constraint(model, denom_target(g) == t)
+
+    for (i, _denom) in enumerate(_denom_range)
+        fix(t, _denom)
+        @objective(model, Max, num_target(g))
+        optimize!(model)
+        _max_vals[i] = target(g())
+        @objective(model, Min, num_target(g))
+        optimize!(model)
+        _min_vals[i] = target(g())
+    end
+
+    _max = maximum(_max_vals)
+    _min = minimum(_min_vals)
+
+    FittedNeighborhoodWorstCase(method=method,
+        target=target,
+        model=model,
+        gmodel=g,
+        g1=nothing,
+        g2=nothing,
+        lower=_min,
+        upper=_max)
+end
+
+function StatsBase.fit(method::FittedNeighborhoodWorstCase{<:Empirikos.AbstractPosteriorTarget},
+    target::Empirikos.AbstractPosteriorTarget, ::Empirikos.ConvexVexity)
+    # TODO: Cache results here too? But maybe wait for ParametricOptInterface first
+    StatsBase.fit(method.method, target)
+end
+
 
 
 function StatsBase.fit(method::NeighborhoodWorstCase{<:Empirikos.FittedEBayesNeighborhood},

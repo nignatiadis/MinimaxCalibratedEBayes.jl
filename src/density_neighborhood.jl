@@ -119,6 +119,7 @@ Base.@kwdef struct InfinityNormDensityBand <: Empirikos.EBayesNeighborhood
    α::Float64 = 0.05
 end
 
+Empirikos.vexity(::InfinityNormDensityBand) = Empirikos.LinearVexity()
 function Empirikos._set_defaults(method::InfinityNormDensityBand,
                                 Zs::AbstractVector{<:Empirikos.AbstractNormalSample{<:Number}};
                                 hints...)
@@ -158,6 +159,8 @@ Base.@kwdef struct FittedInfinityNormDensityBand{T<:Real, S, K} <: Empirikos.Fit
     boot_samples
     method = nothing
 end
+
+Empirikos.vexity(method::FittedInfinityNormDensityBand) = Empirikos.LinearVexity()
 
 function Empirikos.nominal_alpha(inftyband::FittedInfinityNormDensityBand)
     Empirikos.nominal_alpha(inftyband.method)
