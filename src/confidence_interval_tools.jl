@@ -47,15 +47,16 @@ end
 end
 
 
-function gaussian_ci(se; maxbias=0.0, α=0.05)
-    @show se,maxbias,α
-    nc = NoncentralChisq(1, abs2(maxbias))
-    se*sqrt(quantile(nc, 1-α))
-end
+#function gaussian_ci(se; maxbias=0.0, α=0.05)
+#    @show se,maxbias,α
+ #   nc = NoncentralChisq(1, abs2(maxbias))
+ #   se*sqrt(quantile(nc, 1-α))
+#end
 
-function gaussian_ci_test(se; maxbias=0.0, α=0.05)
-    @show se,maxbias,α
+function gaussian_ci(se; maxbias=0.0, α=0.05)
+    #@show se,maxbias,α
     level = 1 - α
+    maxbias = abs(maxbias)
     rel_bias = maxbias/se
     zz = fzero( z-> cdf(Normal(), rel_bias-z) + cdf(Normal(), -rel_bias-z) +  level -1,
         0, rel_bias - quantile(Normal(),(1- level)/2.1))

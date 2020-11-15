@@ -101,8 +101,10 @@ end
 
 
 function (half_ci::HalfCIWidth)(bias, unit_var_proxy)
+    @show bias
     se = sqrt(unit_var_proxy/half_ci.n)
-    gaussian_ci(se; maxbias=bias, α=half_ci.α)
+    @show se
+    @show gaussian_ci(se; maxbias=bias, α=half_ci.α)
 end
 
 
@@ -113,7 +115,7 @@ Base.@kwdef struct LocalizedAffineMinimax{N, G, M}
     discretizer = DataBasedDefault()
     plugin_G
     data_split = :none
-    delta_grid = 0.2:0.5:5
+    delta_grid = 0.2:0.5:6.7
     delta_objective = RMSE()
     estimated_marginal_density = nothing
     modulus_model::M = nothing
@@ -390,7 +392,9 @@ function StatsBase.confint(method::LocalizedAffineMinimax, target::Empirikos.Abs
         end
     end
 
-    nbhood_worst_case = NeighborhoodWorstCase(method.neighborhood, method.convexclass, method.solver)
+    nbhood_worst_case = NeighborhoodWorstCase(neighborhood = method.neighborhood,
+            convexclass = method.convexclass,
+            solver= method.solver)
     outer_ci = StatsBase.confint(nbhood_worst_case, target)
     outer_ci =  @set outer_ci.α = α
 
@@ -424,7 +428,7 @@ function StatsBase.confint(method::LocalizedAffineMinimax, target::Empirikos.Abs
     var_Q_upper = var(Q_upper, _wts)/n
     estimate_upper = confint_upper.estimate
 
-    cov_lower_upper = cov(Q_lower, Q_upper)/n
+    cov_lower_upper = cov([Q_lower Q_upper], _wts)[1,2]/n
 
     @show  confint_lower.lower, confint_lower.upper
     @show confint_upper.lower, confint_upper.upper
