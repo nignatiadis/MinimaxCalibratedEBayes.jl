@@ -57,6 +57,9 @@ plot!(prostate_marginal_plot, fitted_infty_nbhood,
 plot!([-3.0;3.0], seriestype=:vline, linestyle=:dot, label=nothing, color=:lightgrey)
 savefig("prostate_kde_band.tikz")
 
+discr = Empirikos.Discretizer(-3.0:0.005:3.0)
+
+
 nbhood_method_dkw_scalemix = NeighborhoodWorstCase(neighborhood = fitted_dkw,
                                convexclass = gcal_scalemix, solver = quiet_mosek)
 
@@ -71,7 +74,6 @@ nbhood_method_kde_locmix = NeighborhoodWorstCase(neighborhood = fitted_infty_nbh
                                convexclass = gcal_locmix, solver = quiet_mosek)
 
 
-discr = Empirikos.Discretizer(-3.0:0.005:3.0)
 
 lam_kde_scalemix = Empirikos.LocalizedAffineMinimax(neighborhood = (@set infty_nbhood.α=0.01),
                             discretizer=discr,
