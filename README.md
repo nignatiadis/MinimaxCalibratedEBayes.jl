@@ -1,4 +1,9 @@
+# Archived: **See the [Empirikos.jl](https://github.com/nignatiadis/Empirikos.jl) package instead.**
+
+
 # MinimaxCalibratedEBayes.jl
+
+
 
 A Julia package for conducting inference on empirical Bayes estimands and linear functionals in
 the Deconvolution model.
